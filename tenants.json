@@ -1,0 +1,13 @@
+{
+  "FIDI": {
+    "rut": "77285542-7",
+    "nombre": "Fidi SpA",
+    "activo": true
+  },
+  "CISI": {
+    "rut": "77949039-4",
+    "nombre": "Constructora, Inmobiliaria, Servicios e Ingenieria SpA",
+    "activo": true
+  }
+}
+

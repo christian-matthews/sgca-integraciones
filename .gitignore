@@ -1,0 +1,44 @@
+# Entorno
+.env
+.env.local
+.env.*.local
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Archivos generados
+generados/
+*.xlsx
+*.xml
+
+# Node (si aplica)
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+logs/
+
+# Archivos temporales
+*.tmp
+*.temp
+.cache/
+
+# Archivos de configuración sensibles
+config/empresas/*.json
+
+# Archivos de datos descargados
+*.json
+!tenants.json
+!package.json
+
