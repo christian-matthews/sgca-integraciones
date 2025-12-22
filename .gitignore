@@ -19,26 +19,23 @@ __pycache__/
 # Archivos generados
 generados/
 *.xlsx
-*.xml
 
-# Node (si aplica)
-node_modules/
-package-lock.json
-
-# Logs
-*.log
-logs/
-
-# Archivos temporales
+# Archivos temporales y de prueba
+temp/
 *.tmp
 *.temp
 .cache/
+*.log
+logs/
 
-# Archivos de configuración sensibles
-config/empresas/*.json
+# Node
+node_modules/
+package-lock.json
 
-# Archivos de datos descargados
+# Configuración sensible de empresas
+skualo/config/empresas/*.json
+
+# Datos descargados (excepto config necesarios)
 *.json
-!tenants.json
-!package.json
-
+!skualo/config/tenants.json
+!skualo/scripts/package.json

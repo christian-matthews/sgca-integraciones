@@ -7,8 +7,8 @@ import json
 from pathlib import Path
 from typing import Optional, List, Dict
 
-# Directorio de configuraciones
-CONFIG_DIR = Path(__file__).parent.parent / 'config' / 'empresas'
+# Directorio de configuraciones (dentro de skualo/)
+CONFIG_DIR = Path(__file__).parent / 'config' / 'empresas'
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
 
