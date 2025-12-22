@@ -1,6 +1,6 @@
 # SGCA - Sistema de Gestión y Control Administrativo
 
-Sistema modular para integración con APIs de ERPs (Skualo, Odoo, etc.)
+Sistema modular para integración con APIs de ERPs (Skualo, Odoo/FactorIT).
 
 ## 📁 Estructura
 
@@ -15,25 +15,24 @@ SGCA/
 │   │   ├── tenants.json      # Empresas disponibles
 │   │   └── empresas/         # Config por empresa (*.json)
 │   ├── docs/                 # Documentación
-│   │   ├── api_summary.md    # Resumen API
-│   │   ├── consultas_soporte.md
-│   │   ├── webhooks.md
-│   │   └── control_pendientes.md
-│   └── scripts/              # Scripts de desarrollo
-│       ├── balance_excel.py
-│       ├── test-connection.js
-│       └── ...
+│   └── scripts/
+│       ├── balance_excel_v2.py  # Balance + EERR Excel
+│       ├── pendientes.py        # Reporte pendientes JSON
+│       └── control_pendientes.py
 │
-├── odoo/                      # (Futuro) API Odoo
+├── odoo/                      # PostgreSQL Odoo (FactorIT)
+│   ├── __init__.py           # Módulo principal
+│   ├── test_connection.py    # Test de conexión
+│   ├── pendientes.py         # Reporte pendientes JSON
+│   ├── balance_excel.py      # Balance + EERR Excel
+│   ├── bancos_pendientes.py  # Movimientos bancarios
+│   └── README.md
+│
 ├── common/                    # Código compartido
-│
-├── generados/                 # Archivos generados (ignorados)
-├── temp/                      # Archivos temporales (ignorados)
-│
+├── generados/                 # Archivos Excel (ignorados)
+├── temp/                      # Archivos JSON temporales
 ├── .env                       # Variables de entorno
-├── .gitignore
-├── requirements.txt
-└── README.md
+└── requirements.txt
 ```
 
 ## 🚀 Instalación
@@ -46,13 +45,94 @@ cd SGCA-SKUALOAPI
 # Dependencias
 pip install -r requirements.txt
 
-# Configurar token
-echo "SKUALO_API_TOKEN=tu-token" > .env
+# Configurar variables de entorno
+cat > .env << EOF
+# Skualo
+SKUALO_API_TOKEN=tu-token-skualo
+
+# Odoo/FactorIT (PostgreSQL)
+SERVER=18.223.205.221
+PORT=5432
+DB_USER=tu-usuario
+PASSWORD=tu-password
+EOF
 ```
+
+---
+
+## 📋 Reportes de Pendientes (JSON)
+
+Genera JSON con todos los pendientes para inyectar en otros sistemas.
+
+### Skualo
+
+```bash
+python -m skualo.scripts.pendientes           # Todas las empresas
+python -m skualo.scripts.pendientes FIDI      # Solo FIDI
+python -m skualo.scripts.pendientes CISI      # Solo CISI
+```
+
+### Odoo (FactorIT)
+
+```bash
+python -m odoo.pendientes                     # Todas las empresas
+```
+
+### Estructura JSON
+
+```json
+{
+  "generado": "2025-12-22T00:25:39",
+  "version": "1.0",
+  "resumen": {
+    "total_sii": 14,
+    "total_sii_monto": 11959665,
+    "total_contabilizar": 10,
+    "total_conciliar": 698
+  },
+  "empresas": [
+    {
+      "empresa": "FactorIT SpA",
+      "pendientes_sii": { "cantidad": 6, "total": 7083642, "documentos": [...] },
+      "pendientes_contabilizar": { "cantidad": 0, "documentos": [...] },
+      "pendientes_conciliar": { "cantidad": 683, "por_banco": [...], "movimientos": [...] }
+    }
+  ]
+}
+```
+
+---
+
+## 📊 Balance + Estado de Resultados (Excel)
+
+### Skualo
+
+```bash
+python -m skualo.scripts.balance_excel_v2
+```
+
+### Odoo (FactorIT)
+
+```bash
+python -m odoo.balance_excel FactorIT         # FactorIT SpA
+python -m odoo.balance_excel FactorIT2        # FactorIT Ltda
+python -m odoo.balance_excel FactorIT 2025-11-30  # Con fecha corte
+```
+
+### Características
+
+- ✅ Balance Clasificado (Activos, Pasivos, Patrimonio)
+- ✅ Estado de Resultados (Ingresos, Costos, Gastos, Resultado Neto)
+- ✅ **Resultado del Período incluido en Patrimonio**
+- ✅ Verificación de Cuadratura: Activos = Pasivos + Patrimonio
+- ✅ KPIs Financieros (Margen Bruto, ROA, ROE)
+- ✅ Hojas de detalle por cuenta con hipervínculos
+
+---
 
 ## 💻 Uso - Skualo
 
-### CLI Directo
+### CLI
 
 ```bash
 # Setup empresa (primera vez)
@@ -74,8 +154,6 @@ python -m skualo.cli reporte 77285542-7
 from skualo import SkualoControl
 
 ctrl = SkualoControl()
-
-# Setup empresa
 ctrl.setup_empresa('77285542-7')
 
 # Controles
@@ -86,6 +164,79 @@ ctrl.documentos_por_contabilizar('77285542-7')
 # Balance Excel
 ctrl.generar_balance_excel('77285542-7', '202511')
 ```
+
+---
+
+## 💻 Uso - Odoo (FactorIT)
+
+### CLI
+
+```bash
+# Test de conexión
+python -m odoo.test_connection
+
+# Pendientes (JSON)
+python -m odoo.pendientes
+
+# Balance Excel
+python -m odoo.balance_excel FactorIT
+
+# Movimientos bancarios
+python -m odoo.bancos_pendientes
+```
+
+### Como Módulo Python
+
+```python
+from odoo import obtener_pendientes, generar_balance_excel
+
+# Obtener pendientes de todas las empresas
+data = obtener_pendientes()
+print(f"SII: {data['resumen']['total_sii']}")
+print(f"Contabilizar: {data['resumen']['total_contabilizar']}")
+print(f"Conciliar: {data['resumen']['total_conciliar']}")
+
+# Generar Balance Excel
+generar_balance_excel('FactorIT')
+```
+
+---
+
+## 📝 Empresas Configuradas
+
+### Skualo ERP (API REST)
+
+| Alias | RUT | Nombre |
+|-------|-----|--------|
+| FIDI | 77285542-7 | Fidi SpA |
+| CISI | 77949039-4 | Constructora CISI |
+
+### Odoo (PostgreSQL Directo)
+
+| Alias | Base de Datos | Nombre |
+|-------|---------------|--------|
+| FactorIT | FactorIT | FactorIT SpA |
+| FactorIT2 | FactorIT2 | FactorIT Ltda |
+
+---
+
+## 📊 Estado Actual de Pendientes (22-Dic-2025)
+
+### Skualo
+
+| Empresa | SII | Contabilizar | Conciliar |
+|---------|-----|--------------|-----------|
+| FIDI SpA | 0 | 0 | 1 mov |
+| CISI SpA | 2 ($119K) | 7 ($10.8M) | 68 movs |
+
+### Odoo (FactorIT)
+
+| Empresa | SII | Contabilizar | Conciliar |
+|---------|-----|--------------|-----------|
+| FactorIT SpA | 6 ($7.1M) | 0 | 683 movs |
+| FactorIT Ltda | 8 ($4.9M) | 10 | 15 movs |
+
+---
 
 ## 📊 Endpoints Validados (Skualo)
 
@@ -102,20 +253,19 @@ ctrl.generar_balance_excel('77285542-7', '202511')
 | DTEs Recibidos | `/sii/dte/recibidos` | ✅ |
 | Webhooks | `/integraciones/webhooks` | ✅ |
 
-## 📝 Empresas Configuradas
-
-| Alias | RUT | Nombre |
-|-------|-----|--------|
-| FIDI | 77285542-7 | Fidi SpA |
-| CISI | 77949039-4 | Constructora CISI |
-
-## 🔗 Integración con Bot Telegram
-
-Ver [GIT_FILES.md](GIT_FILES.md) para detalles de integración.
+---
 
 ## 📖 Documentación
 
+### Skualo
 - [API Summary](skualo/docs/api_summary.md)
 - [Webhooks](skualo/docs/webhooks.md)
 - [Control de Pendientes](skualo/docs/control_pendientes.md)
-- [Consultas Soporte](skualo/docs/consultas_soporte.md)
+- [Sistema Balance](skualo/docs/SISTEMA_BALANCE_README.md)
+
+### Odoo
+- [README Odoo](odoo/README.md) - Conexión, queries y reportes
+
+---
+
+*Última actualización: 22 Diciembre 2025*

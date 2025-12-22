@@ -344,7 +344,7 @@ def crear_resumen(balance, writer, config):
     
     total_activos = totales.get("activo_corriente", 0) + totales.get("activo_no_corriente", 0) + totales.get("intangibles", 0)
     total_pasivos = totales.get("pasivo_corriente", 0) + totales.get("pasivo_no_corriente", 0)
-    total_patrimonio = totales.get("patrimonio", 0)
+    patrimonio_sin_resultado = totales.get("patrimonio", 0)
     
     # ═══════════════════════════════════════════════════════════
     # ESTADO DE RESULTADOS
@@ -354,6 +354,15 @@ def crear_resumen(balance, writer, config):
     
     impuesto = -eerr["resultado_antes_impuestos"] * tasa_impuesto if eerr["resultado_antes_impuestos"] > 0 else 0
     resultado_neto = eerr["resultado_antes_impuestos"] + impuesto
+    
+    # ═══════════════════════════════════════════════════════════
+    # PATRIMONIO TOTAL (incluye resultado del período)
+    # ═══════════════════════════════════════════════════════════
+    total_patrimonio = patrimonio_sin_resultado + resultado_neto
+    
+    # Verificación de cuadratura
+    diferencia_cuadratura = total_activos - (total_pasivos + total_patrimonio)
+    cuadra = abs(diferencia_cuadratura) < 1  # Tolerancia de $1 por redondeos
     
     # ═══════════════════════════════════════════════════════════
     # KPIs
@@ -459,6 +468,11 @@ def crear_resumen(balance, writer, config):
     for nombre, valor in categorias.get("patrimonio", []):
         rows.append([f"  {nombre}", valor, "", "", ""])
         row_types.append("item")
+    # Agregar resultado del período
+    rows.append([f"  Resultado del Período", resultado_neto, "", "", ""])
+    row_types.append("item")
+    rows.append([f"  (Patrimonio sin resultado)", patrimonio_sin_resultado, "", "", "(referencia)"])
+    row_types.append("item")
     rows.append(["TOTAL PATRIMONIO", total_patrimonio, "", "", ""])
     row_types.append("total")
     
@@ -466,6 +480,16 @@ def crear_resumen(balance, writer, config):
     row_types.append("empty")
     rows.append(["TOTAL PASIVOS + PATRIMONIO", total_pasivos + total_patrimonio, "", "", ""])
     row_types.append("total_final")
+    
+    # Verificación de cuadratura
+    rows.append(["", "", "", "", ""])
+    row_types.append("empty")
+    if cuadra:
+        rows.append(["✅ CUADRATURA OK: Activos = Pasivos + Patrimonio", "", "", "", ""])
+        row_types.append("verification_ok")
+    else:
+        rows.append([f"⚠️ DESCUADRE: Diferencia = ${diferencia_cuadratura:,.0f}", "", "", "", ""])
+        row_types.append("verification_error")
     
     rows.append(["", "", "", "", ""])
     row_types.append("empty")
@@ -582,6 +606,10 @@ def crear_resumen(balance, writer, config):
             cell_a.fill = ESTILOS["fill_total_final"]
             cell_b.font = ESTILOS["font_total_final"]
             cell_b.fill = ESTILOS["fill_total_final"]
+        elif row_type == "verification_ok":
+            cell_a.font = Font(bold=True, color="006400")  # Verde
+        elif row_type == "verification_error":
+            cell_a.font = Font(bold=True, color="FF0000")  # Rojo
         elif row_type == "header_kpi":
             cell_a.font = Font(bold=True)
             cell_b.font = Font(bold=True)
