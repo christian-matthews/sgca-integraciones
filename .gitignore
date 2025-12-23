@@ -39,4 +39,4 @@ skualo/config/empresas/*.json
 *.json
 !skualo/config/tenants.json
 !skualo/scripts/package.json
-bridge/company_map.json
+!bridge/company_map.json

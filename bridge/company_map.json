@@ -1,0 +1,28 @@
+{
+  "FactorIT": {
+    "tenant_id": "6cf187d9-33a3-43d0-86f7-98801561dd50",
+    "company_id": "b414a16f-c0ea-405f-b17e-d7f09aa1562a",
+    "nombre": "FactorIT SpA",
+    "odoo": {
+      "enabled": true,
+      "db_name": "FactorIT"
+    },
+    "skualo": {
+      "enabled": false,
+      "rut": null
+    }
+  },
+  "FactorIT2": {
+    "tenant_id": "6cf187d9-33a3-43d0-86f7-98801561dd50",
+    "company_id": "e98f87ea-6c5f-4e92-b466-87b9ff806c2c",
+    "nombre": "FactorIT Ltda",
+    "odoo": {
+      "enabled": true,
+      "db_name": "FactorIT2"
+    },
+    "skualo": {
+      "enabled": false,
+      "rut": null
+    }
+  }
+}
