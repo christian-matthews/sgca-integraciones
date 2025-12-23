@@ -268,4 +268,73 @@ generar_balance_excel('FactorIT')
 
 ---
 
-*Última actualización: 22 Diciembre 2025*
+---
+
+## 🔗 Bridge SGCA (Odoo → expected_item_checks)
+
+Módulo para sincronizar pendientes Odoo hacia el core SGCA.
+
+### Instalación
+
+```bash
+pip install -r requirements.txt
+```
+
+### Comandos
+
+```bash
+# Sync completo (ambas empresas)
+python -m bridge.sync_odoo_to_checks --period 2025-12
+
+# Solo una empresa
+python -m bridge.sync_odoo_to_checks --period 2025-12 --only FactorIT
+
+# Dry-run (no escribe)
+python -m bridge.sync_odoo_to_checks --period 2025-12 --dry-run
+
+# Solo SLA semanal o mensual
+python -m bridge.sync_odoo_to_checks --period 2025-12 --sla-type weekly
+python -m bridge.sync_odoo_to_checks --period 2025-12 --sla-type monthly
+```
+
+### SLA Implementados
+
+| Tipo | Deadline | Autocierre |
+|------|----------|------------|
+| Semanal | Miércoles T+1 @ 18:00 (Chile) | Si backlog = 0 |
+| Mensual | 3 días hábiles post-cierre @ 18:00 | Si backlog = 0 |
+
+### Checks Creados
+
+| Código | Descripción |
+|--------|-------------|
+| `REVISION_FACTURAS_PROVEEDOR` | Facturas pendientes SII |
+| `DIGITACION_FACTURAS` | Facturas por contabilizar |
+| `CONCILIACION_BANCARIA` | Movimientos por conciliar |
+| `CIERRE_SEMANAL_CONTABILIZACION` | SLA semanal contabilización |
+| `CIERRE_SEMANAL_CONCILIACION` | SLA semanal conciliación |
+| `CIERRE_MENSUAL_CONTABILIZACION` | SLA mensual contabilización |
+| `CIERRE_MENSUAL_CONCILIACION` | SLA mensual conciliación |
+
+### Mapeo Empresas
+
+El archivo `bridge/company_map.json` mapea alias Odoo → company_id SGCA:
+
+```json
+{
+  "FactorIT": { "tenant_id": "...", "company_id": "..." },
+  "FactorIT2": { "tenant_id": "...", "company_id": "..." }
+}
+```
+
+Este archivo se genera desde `sgca-core/scripts/seed_factorit_two_companies.py`.
+
+### Checkpoint
+
+- **Tag:** `checkpoint/factorit-pipeline-v1-bridge`
+- **Fecha:** 2025-12-23
+- **Repo relacionado:** `sgca-core` tag `checkpoint/factorit-pipeline-v1-core`
+
+---
+
+*Última actualización: 23 Diciembre 2025*
