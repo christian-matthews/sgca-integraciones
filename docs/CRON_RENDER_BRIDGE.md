@@ -78,28 +78,15 @@ TZ=America/Santiago
 
 ---
 
-## Horarios acordados
+## Horario del cron
 
-| Sistema | Horario AM | Horario PM | Función |
-|---------|------------|------------|---------|
-| **Odoo** | 07:00 | 19:00 | Actualiza pendientes |
-| **Skualo** | 07:00 | 19:00 | Actualiza pendientes |
-| **Bridge** | 07:30 | 19:30 | Sincroniza → Supabase |
-| **Core** | 07:40 | 19:40 | Detecta atrasos, escala |
+| Sistema | Horario | Función |
+|---------|---------|---------|
+| **Bridge** | 05:00 AM | Sincroniza Odoo → Supabase |
 
 **Timezone:** America/Santiago (Chile Continental)
 
----
-
-## ⚠️ IMPORTANTE
-
-> **El bridge SIEMPRE debe correr después de las fuentes y antes del core.**
-
-Secuencia obligatoria:
-```
-Fuentes (07:00) → Bridge (07:30) → Core (07:40)
-Fuentes (19:00) → Bridge (19:30) → Core (19:40)
-```
+**Frecuencia:** Una vez al día, de lunes a viernes.
 
 ---
 
@@ -110,8 +97,8 @@ Fuentes (19:00) → Bridge (19:30) → Core (19:40)
 ```yaml
 services:
   - type: cron
-    name: sgca-bridge-am
-    schedule: "30 10 * * 1-5"  # 07:30 Chile = 10:30 UTC
+    name: sgca-bridge
+    schedule: "0 8 * * 1-5"  # 05:00 Chile = 08:00 UTC
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/run_bridge_scheduled.py
     envVars:
@@ -121,18 +108,11 @@ services:
         value: "true"
       - key: BRIDGE_ENABLE_SKUALO
         value: "true"
-
-  - type: cron
-    name: sgca-bridge-pm
-    schedule: "30 22 * * 1-5"  # 19:30 Chile = 22:30 UTC
-    buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/run_bridge_scheduled.py
-    envVars:
-      - key: TZ
-        value: America/Santiago
 ```
 
-**Nota:** Horarios en cron de Render son UTC. Ajustar según DST de Chile.
+**Nota:** 
+- Horarios en cron de Render son UTC
+- 05:00 Chile = 08:00 UTC (en verano, ajustar en invierno a 09:00 UTC)
 
 ---
 
