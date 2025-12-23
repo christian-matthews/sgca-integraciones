@@ -3,13 +3,11 @@
 > **Última actualización:** 2025-12-23
 > **Timezone:** America/Santiago (Chile Continental)
 
-## Secuencia de Ejecución
+## Horario de Ejecución
 
-| Sistema | Horario AM | Horario PM | Descripción |
-|---------|------------|------------|-------------|
-| **Odoo** | 07:00 | 19:00 | Actualiza pendientes (job interno) |
-| **Bridge SGCA** | 07:30 | 19:30 | Sincroniza Odoo → Supabase |
-| **Core SGCA** | 07:40 | 19:40 | Detecta atrasos, escala findings |
+| Sistema | Horario | Frecuencia | Descripción |
+|---------|---------|------------|-------------|
+| **Bridge SGCA** | 05:00 AM | Diario (L-V) | Sincroniza Odoo → Supabase |
 
 ---
 
@@ -27,68 +25,34 @@ python scripts/run_bridge_scheduled.py
 # render.yaml
 services:
   - type: cron
-    name: sgca-bridge-am
-    schedule: "30 10 * * 1-5"  # 07:30 Chile = 10:30 UTC (días hábiles)
+    name: sgca-bridge
+    schedule: "0 8 * * 1-5"  # 05:00 Chile = 08:00 UTC (días hábiles)
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/run_bridge_scheduled.py
     envVars:
       - key: TZ
         value: America/Santiago
-
-  - type: cron
-    name: sgca-bridge-pm
-    schedule: "30 22 * * 1-5"  # 19:30 Chile = 22:30 UTC (días hábiles)
-    buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/run_bridge_scheduled.py
-    envVars:
-      - key: TZ
-        value: America/Santiago
+      - key: BRIDGE_ENABLE_ODOO
+        value: "true"
+      - key: BRIDGE_ENABLE_SKUALO
+        value: "true"
 ```
 
 ### Variables de Entorno Requeridas
 
 ```env
+# Supabase
 SUPABASE_URL=https://uwpnfdmirqwmuuzjwlzo.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
-ODOO_URL=https://odoo.factorit.cl
-ODOO_DB_FACTORIT=FactorIT
-ODOO_DB_FACTORIT2=FactorIT2
-ODOO_USERNAME=api_user
-ODOO_PASSWORD=***
+
+# Odoo
+SERVER=odoo-db.factorit.cl
+PORT=5432
+DB_USER=api_user
+PASSWORD=***
+
+# Timezone
 TZ=America/Santiago
-```
-
----
-
-## Core SGCA (sgca-core)
-
-### Comando Render
-
-```bash
-python jobs/daily_run.py
-```
-
-### Configuración Cron en Render
-
-```yaml
-services:
-  - type: cron
-    name: sgca-core-am
-    schedule: "40 10 * * 1-5"  # 07:40 Chile = 10:40 UTC
-    buildCommand: pip install -r requirements.txt
-    startCommand: python jobs/daily_run.py
-    envVars:
-      - key: TZ
-        value: America/Santiago
-
-  - type: cron
-    name: sgca-core-pm
-    schedule: "40 22 * * 1-5"  # 19:40 Chile = 22:40 UTC
-    buildCommand: pip install -r requirements.txt
-    startCommand: python jobs/daily_run.py
-    envVars:
-      - key: TZ
-        value: America/Santiago
 ```
 
 ---
@@ -97,16 +61,13 @@ services:
 
 | Chile (America/Santiago) | UTC |
 |--------------------------|-----|
-| 07:30 | 10:30 (verano) / 11:30 (invierno) |
-| 19:30 | 22:30 (verano) / 23:30 (invierno) |
+| 05:00 | 08:00 (verano) / 09:00 (invierno) |
 
-**Nota:** Chile usa horario de verano (DST). Render ejecuta en UTC, así que los horarios deben ajustarse según la época del año, o usar la variable `TZ=America/Santiago`.
+**Nota:** Chile usa horario de verano (DST). Actualmente estamos en verano, así que 05:00 Chile = 08:00 UTC.
 
 ---
 
 ## Verificación Manual
-
-### Bridge
 
 ```bash
 cd sgca-integraciones
@@ -117,17 +78,11 @@ python scripts/run_bridge_scheduled.py --dry-run
 # Ejecutar solo FactorIT
 python scripts/run_bridge_scheduled.py --only FactorIT
 
-# Ejecutar ambas empresas
-python scripts/run_bridge_scheduled.py
-```
+# Ejecutar ambas empresas (Odoo)
+python scripts/run_bridge_scheduled.py --source odoo
 
-### Core
-
-```bash
-cd sgca-core
-
-# Ejecutar job diario
-python jobs/daily_run.py
+# Ejecutar ambas fuentes
+python scripts/run_bridge_scheduled.py --source both
 ```
 
 ---
@@ -137,23 +92,33 @@ python jobs/daily_run.py
 ### Logs esperados del Bridge
 
 ```
-2025-01-15 07:30:05 [INFO] ============================================================
-2025-01-15 07:30:05 [INFO] SGCA BRIDGE - EJECUCIÓN PROGRAMADA
-2025-01-15 07:30:05 [INFO] ============================================================
-2025-01-15 07:30:05 [INFO]   Start time : 2025-01-15T07:30:05-03:00
-2025-01-15 07:30:05 [INFO]   Timezone   : America/Santiago
-2025-01-15 07:30:05 [INFO]   Period     : 2025-01
-2025-01-15 07:30:05 [INFO]   Empresas   : FactorIT, FactorIT2
+2025-01-15 05:00:05 [INFO] ======================================================================
+2025-01-15 05:00:05 [INFO] SGCA BRIDGE - EJECUCIÓN PROGRAMADA MULTI-FUENTE
+2025-01-15 05:00:05 [INFO] ======================================================================
+2025-01-15 05:00:05 [INFO]   Start time : 2025-01-15T05:00:05-03:00
+2025-01-15 05:00:05 [INFO]   Timezone   : America/Santiago
+2025-01-15 05:00:05 [INFO]   Period     : 2025-01
+2025-01-15 05:00:05 [INFO]   Source     : both
+2025-01-15 05:00:05 [INFO]   Empresas   : todas
 ...
-2025-01-15 07:30:12 [INFO]   Duración     : 7.23s
-2025-01-15 07:30:12 [INFO]   Exit code    : 0
+2025-01-15 05:00:12 [INFO] RESUMEN FINAL
+2025-01-15 05:00:12 [INFO]   ODOO       : ✅ (2 empresas)
+2025-01-15 05:00:12 [INFO]   SKUALO     : SKIPPED (no_companies_enabled)
+2025-01-15 05:00:12 [INFO]   Duración   : 8.89s
+2025-01-15 05:00:12 [INFO]   Exit code  : 0
 ```
 
 ### Alertas
 
-- **Exit code 1**: Revisar logs, puede haber error de conexión a Odoo o Supabase
-- **Sin snapshots**: Verificar que `erp_backlog_snapshots` tenga registros recientes
-- **Checks no actualizados**: Verificar `expected_item_checks` con la fecha de hoy
+| Exit Code | Significado | Acción |
+|-----------|-------------|--------|
+| `0` | Éxito | Nada |
+| `1` | Error | Revisar logs de Render |
+
+### Verificaciones post-ejecución
+
+- **Snapshots:** `erp_backlog_snapshots` debe tener registros de hoy
+- **Checks:** `expected_item_checks` debe tener el período actual
 
 ---
 
@@ -163,10 +128,7 @@ python jobs/daily_run.py
 
 ```bash
 # Verificar conectividad
-curl -I https://odoo.factorit.cl
-
-# Verificar credenciales
-python -c "from odoo.pendientes import obtener_pendientes_empresa; print(obtener_pendientes_empresa('FactorIT'))"
+psql -h $SERVER -p $PORT -U $DB_USER -d FactorIT -c "SELECT 1"
 ```
 
 ### Bridge no conecta a Supabase
@@ -175,9 +137,6 @@ python -c "from odoo.pendientes import obtener_pendientes_empresa; print(obtener
 # Verificar variables
 echo $SUPABASE_URL
 echo $SUPABASE_SERVICE_ROLE_KEY | head -c 20
-
-# Test rápido
-python -c "from supabase import create_client; c = create_client('$SUPABASE_URL', '$SUPABASE_SERVICE_ROLE_KEY'); print(c.table('companies').select('name').limit(1).execute())"
 ```
 
 ### Timezone incorrecto
@@ -186,9 +145,12 @@ python -c "from supabase import create_client; c = create_client('$SUPABASE_URL'
 # Verificar timezone en el container
 date
 echo $TZ
-
-# Forzar timezone
-export TZ=America/Santiago
-date
+# Debe mostrar hora de Chile
 ```
 
+### company_map.json no encontrado
+
+Este archivo debe estar en el repo. Verificar:
+```bash
+ls -la bridge/company_map.json
+```
