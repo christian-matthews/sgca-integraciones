@@ -104,7 +104,53 @@ def es_cuenta_banco(cuenta):
 cuentas_banco = [c for c in balance if es_cuenta_banco(c)]
 ```
 
-#### Paso 3: Obtener libro mayor de cada cuenta de banco
+#### Paso 3: Obtener movimientos bancarios ✅ ENDPOINT CORRECTO
+```
+GET /{RUT}/bancos/{idCuenta}?PageSize=100&Page={n}
+```
+
+**Ejemplo:**
+```
+GET /77285645-8/bancos/1102007?PageSize=100&Page=1
+```
+
+#### Paso 4: Filtrar movimientos no conciliados
+```python
+# Estructura de movimiento bancario:
+{
+    "id": "ebafc5b6-eab9-4d4d-b8bf-003e6e0a50e6",
+    "idCuenta": "1102007",
+    "cuenta": "Banco Itau",
+    "fecha": "2025-12-22T00:00:00-03:00",
+    "numDoc": 918726,
+    "glosa": "F CIRCLE 246669",
+    "montoCargo": 122169.0,      # Débito
+    "montoAbono": 0.0,           # Crédito
+    "conciliado": false,         # ← CAMPO CLAVE
+    "fechaConciliacion": null
+}
+
+# Filtrar pendientes:
+no_conciliados = [m for m in movimientos if m['conciliado'] == False]
+```
+
+### Ejemplo de resultado (THE WINGMAN SPA - Dic 2025):
+```
+🔴 14 movimientos NO conciliados
+   Cargos: $29,756,760
+   Abonos: $15,126,002
+
+Detalle:
+- 2025-12-22: F CIRCLE 246669 - $122,169
+- 2025-12-19: TRANSFERENCIA DE FIDI SPA - $7,000,000 (abono)
+- 2025-12-19: PAGO BDP TGR - $13,571,829
+- 2025-12-10: BDP PREVIRED - $1,525,287
+- 2025-12-09: CUOTA PRESTAMO - $1,207,031
+- 2025-12-05: RETIROS - $12,100,000
+```
+
+### Método alternativo: Libro Mayor
+Si el endpoint `/bancos/{id}` no está disponible, usar:
 ```
 GET /{RUT}/contabilidad/reportes/libromayor
     ?IdCuentaInicio={codigo}
@@ -114,36 +160,7 @@ GET /{RUT}/contabilidad/reportes/libromayor
     &IdSucursal=0
 ```
 
-#### Paso 4: Identificar movimientos no conciliados
-```python
-# En el libro mayor, identificar movimientos sin conciliar
-# Criterios posibles:
-# - Campo 'conciliado' = false (si existe)
-# - Movimientos sin documento asociado
-# - Movimientos con glosa específica
-
-# Estructura típica de movimiento:
-{
-    "fecha": "2025-12-15",
-    "idCuenta": "1102007",
-    "cuenta": "Banco Itau",
-    "montoDebe": 500000,
-    "montoHaber": 0,
-    "glosa": "Depósito cliente",
-    "comprobante": 1234
-}
-```
-
-### Alternativa: Endpoint /bancos (si está disponible)
-```
-GET /{RUT}/bancos              # Listar cuentas
-GET /{RUT}/bancos/{cuentaId}   # Obtener movimientos
-
-# Filtrar: conciliado == false
-```
-
-> ⚠️ Este endpoint puede no estar disponible para todos los tenants.
-> Si devuelve 404 "Tenant Not Found", usar el método del libro mayor.
+> ⚠️ El libro mayor NO tiene campo `conciliado`, solo muestra movimientos contables.
 
 ---
 
@@ -235,12 +252,43 @@ def obtener_pendientes_completo():
 
 ## Resumen de Endpoints
 
-| Propósito | Endpoint |
-|-----------|----------|
-| DTEs recibidos | `GET /sii/dte/recibidos` |
-| Filtrar por emisor | `GET /sii/dte/recibidos?search=RutEmisor eq X` |
-| Libro de compras | `GET /contabilidad/reportes/librocompras/{periodo}` |
-| Balance tributario | `GET /contabilidad/reportes/balancetributario/{periodo}` |
-| Libro mayor | `GET /contabilidad/reportes/libromayor?IdCuentaInicio=X&IdCuentaFin=X&desde=X&hasta=X` |
-| Bancos (si disponible) | `GET /bancos/{cuentaId}` |
+| Propósito | Endpoint | Campo clave |
+|-----------|----------|-------------|
+| DTEs recibidos | `GET /sii/dte/recibidos` | `conAcuseRecibo` |
+| Filtrar por emisor | `GET /sii/dte/recibidos?search=RutEmisor eq X` | - |
+| Libro de compras | `GET /contabilidad/reportes/librocompras/{periodo}` | - |
+| Balance tributario | `GET /contabilidad/reportes/balancetributario/{periodo}` | `idCuenta` |
+| Libro mayor | `GET /contabilidad/reportes/libromayor?IdCuentaInicio=X&IdCuentaFin=X&desde=X&hasta=X` | - |
+| **Movimientos bancarios** | `GET /bancos/{idCuenta}?PageSize=100&Page=N` | `conciliado` |
+
+---
+
+## Flujo Completo para Reporte de Pendientes
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  1. PENDIENTES POR ACEPTAR EN SII                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│  GET /sii/dte/recibidos                                            │
+│  └── Filtrar: conAcuseRecibo == false                              │
+└─────────────────────────────────────────────────────────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  2. PENDIENTES POR CONTABILIZAR                                    │
+├─────────────────────────────────────────────────────────────────────┤
+│  GET /sii/dte/recibidos (aceptados)                                │
+│  GET /contabilidad/reportes/librocompras/{periodo}                 │
+│  └── Comparar: DTEs aceptados vs folios en libro                   │
+└─────────────────────────────────────────────────────────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  3. PENDIENTES DE CONCILIAR                                        │
+├─────────────────────────────────────────────────────────────────────┤
+│  GET /contabilidad/reportes/balancetributario/{periodo}            │
+│  └── Identificar cuentas 1102xxx (bancos)                          │
+│                                                                     │
+│  GET /bancos/{idCuenta}?PageSize=100&Page=N                        │
+│  └── Filtrar: conciliado == false                                  │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
