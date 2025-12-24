@@ -7,7 +7,8 @@
 
 | Consulta | Estado |
 |----------|--------|
-| 1. Aprobar DTEs | ✅ `POST sii/dte/recibidos/{id}/aprobar` |
+| 1. Aprobar DTEs | ⚠️ Endpoint existe pero da error "Tenant Not Found" |
+| 1b. Consultar pendientes | ✅ `?search=RutEmisor eq X` + filtrar `conAcuseRecibo=false` |
 | 2. Contabilizar | ❌ No disponible vía API |
 | 3. Conciliar bancos | ❌ No disponible vía API |
 | 4. Evolutivo resultados | ⏳ Pendiente documentación |
@@ -23,7 +24,7 @@ Copiar y pegar en el chat de soporte:
 
 ---
 
-## CONSULTA 1: Aprobar DTEs ✅ RESPONDIDO
+## CONSULTA 1: Aprobar DTEs ⚠️ PARCIALMENTE RESUELTO
 
 ```
 Hola, estoy usando la API y necesito aprobar DTEs recibidos.
@@ -41,6 +42,47 @@ Gracias.
 ```
 
 **RESPUESTA SOPORTE:** El endpoint es `sii/dte/recibidos/{id}/aprobar`. El id se obtiene del listado de DTEs recibidos.
+
+### ⚠️ PROBLEMA DETECTADO (23/12/2025)
+
+Al intentar usar el endpoint en THE WINGMAN SPA (77285645-8), devuelve:
+```json
+{"isError":true,"type":"https://httpstatuses.com/404","title":"Tenant Not Found","status":404}
+```
+
+**Pendiente consultar a soporte:** ¿Por qué da "Tenant Not Found" si el tenant existe y funciona para otros endpoints?
+
+### ✅ CÓMO CONSULTAR DTEs PENDIENTES DE APROBACIÓN
+
+```python
+# 1. Listar DTEs recibidos de un emisor específico (con filtro OData)
+GET /{RUT}/sii/dte/recibidos?search=RutEmisor eq {RUT_EMISOR}
+
+# 2. Identificar pendientes: buscar documentos donde:
+#    - conAcuseRecibo = false
+#    - fechaRespuesta = null
+
+# Ejemplo de documento pendiente:
+{
+  "idDocumento": "c6a5587b-ace6-4dfd-b5cf-694127a4591c",
+  "rutEmisor": "96945440-8",
+  "emisor": "SOC CONCESIONARIA AUTOPISTA CENTRAL S A",
+  "folio": 19005812,
+  "fechaEmision": "2025-12-17",
+  "montoTotal": 13080.0,
+  "conAcuseRecibo": false,    ← PENDIENTE
+  "fechaRespuesta": null      ← SIN RESPUESTA
+}
+```
+
+### Endpoints relacionados verificados:
+
+| Endpoint | Estado |
+|----------|--------|
+| `GET /sii/dte/recibidos` | ✅ Funciona (lista todos) |
+| `GET /sii/dte/recibidos?search=RutEmisor eq X` | ✅ Funciona (filtra por emisor) |
+| `GET /contabilidad/reportes/librocompras/{periodo}` | ✅ Funciona |
+| `POST /sii/dte/recibidos/{id}/aprobar` | ❌ Error "Tenant Not Found" |
 
 ---
 
