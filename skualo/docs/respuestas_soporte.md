@@ -30,8 +30,11 @@ El `id` se debe obtener del listado de DTEs recibidos (`GET sii/dte/recibidos`).
 
 **Respuesta:** Faltan parámetros necesarios para la consulta. Ver documentación adjunta de "Evolución de Resultados".
 
-**Parámetros requeridos (pendiente revisar documentación):**
-- TODO: Agregar parámetros del documento adjunto
+**Estado:** ⏳ **PENDIENTE** - Skualo aún no ha enviado la documentación con los parámetros requeridos.
+
+**Seguimiento:**
+- Fecha consulta: 23/12/2025
+- Documentación recibida: ❌ No
 
 ### 5. (Sin consulta)
 
