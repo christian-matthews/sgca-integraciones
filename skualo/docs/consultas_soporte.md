@@ -1,10 +1,29 @@
 # Consultas para Soporte Skualo (Chat)
 
+> **⚠️ NOTA IMPORTANTE DEL SOPORTE (23/12/2025):**  
+> "La API está pensada para consultar información de la base de datos, no para reemplazar la interfaz del sistema."
+
+## Resumen de Respuestas
+
+| Consulta | Estado |
+|----------|--------|
+| 1. Aprobar DTEs | ✅ `POST sii/dte/recibidos/{id}/aprobar` |
+| 2. Contabilizar | ❌ No disponible vía API |
+| 3. Conciliar bancos | ❌ No disponible vía API |
+| 4. Evolutivo resultados | ⏳ Pendiente documentación |
+| 5. Libro Mayor | ✅ Resuelto |
+| 6. Listar documentos | ✅ Usar `?search=IDTipoDocumento eq FAVE` |
+| 7. Permisos token | ✅ Acceso total sin restricciones |
+| 8. Webhooks | ✅ Resuelto |
+| 9. Eventos webhook | ⏳ Pendiente |
+
+---
+
 Copiar y pegar en el chat de soporte:
 
 ---
 
-## CONSULTA 1: Aprobar DTEs
+## CONSULTA 1: Aprobar DTEs ✅ RESPONDIDO
 
 ```
 Hola, estoy usando la API y necesito aprobar DTEs recibidos.
@@ -21,9 +40,11 @@ Ejemplo de documento pendiente:
 Gracias.
 ```
 
+**RESPUESTA SOPORTE:** El endpoint es `sii/dte/recibidos/{id}/aprobar`. El id se obtiene del listado de DTEs recibidos.
+
 ---
 
-## CONSULTA 2: Contabilizar Documentos
+## CONSULTA 2: Contabilizar Documentos ❌ NO DISPONIBLE
 
 ```
 Hola, tengo DTEs aceptados en /sii/dte/recibidos pero necesito contabilizarlos asignando:
@@ -38,9 +59,11 @@ Hola, tengo DTEs aceptados en /sii/dte/recibidos pero necesito contabilizarlos a
 Gracias.
 ```
 
+**RESPUESTA SOPORTE:** No hay un endpoint para contabilizar. Debe hacerse desde la interfaz del sistema.
+
 ---
 
-## CONSULTA 3: Conciliar Movimientos Bancarios
+## CONSULTA 3: Conciliar Movimientos Bancarios ❌ NO DISPONIBLE
 
 ```
 Hola, puedo ver movimientos bancarios con GET /bancos/{cuenta}
@@ -54,9 +77,11 @@ Cada movimiento tiene campo "conciliado: false"
 Gracias.
 ```
 
+**RESPUESTA SOPORTE:** No hay un endpoint para conciliar. Debe hacerse desde la interfaz del sistema.
+
 ---
 
-## CONSULTA 4: Estado de Resultados
+## CONSULTA 4: Estado de Resultados (Evolutivo) ⏳ PENDIENTE DOCUMENTACIÓN
 
 ```
 Hola, intento obtener el Estado de Resultados con:
@@ -72,6 +97,10 @@ Empresa: CISI (77949039-4)
 
 Gracias.
 ```
+
+**RESPUESTA SOPORTE:** Faltan parámetros necesarios para la consulta. Adjuntaron documentación "Evolución de Resultados".
+
+**ESTADO:** ⏳ Aún sin recibir la documentación con los parámetros requeridos (23/12/2025)
 
 ---
 
@@ -90,7 +119,7 @@ GET /{RUT}/contabilidad/reportes/libromayor
 
 ---
 
-## CONSULTA 6: Listar Documentos
+## CONSULTA 6: Listar Documentos ✅ RESPONDIDO
 
 ```
 Hola, el endpoint /documentos siempre me da error:
@@ -105,9 +134,16 @@ Ya probé con: IDTipoDocumento, Fecha, Folio, IDEstado
 Gracias.
 ```
 
+**RESPUESTA SOPORTE:** La query estaba mal construida. Debe usar sintaxis OData:
+
+```
+✅ Correcto: ?search=IDTipoDocumento eq FAVE
+❌ Incorrecto: ?IDTipoDocumento=FAVE
+```
+
 ---
 
-## CONSULTA 7: Permisos del Token
+## CONSULTA 7: Permisos del Token ✅ RESPONDIDO
 
 ```
 Hola, ¿podrían confirmar qué permisos tiene mi token?
@@ -121,6 +157,8 @@ Empresas: FIDI (77285542-7), CISI (77949039-4)
 
 Gracias.
 ```
+
+**RESPUESTA SOPORTE:** El token otorga **permiso total** sobre la API, sin restricción alguna.
 
 ---
 
