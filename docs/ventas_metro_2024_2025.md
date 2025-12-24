@@ -106,3 +106,5 @@
 3. NC = Nota de Crédito Electrónica
 4. Todos los montos en pesos chilenos (CLP)
 
+
+
