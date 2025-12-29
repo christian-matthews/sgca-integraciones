@@ -45,6 +45,10 @@ DATABASES = {
     'FactorIT2': 'FactorIT Ltda',
 }
 
+# Fecha mínima para considerar pendientes de conciliación
+# Solo considera movimientos desde esta fecha en adelante
+CONCILIACION_FECHA_MINIMA = '2025-01-01'
+
 
 class JSONEncoder(json.JSONEncoder):
     """Encoder personalizado para tipos de datos especiales."""
@@ -178,7 +182,7 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
     # 3. MOVIMIENTOS BANCARIOS POR CONCILIAR
     # ═══════════════════════════════════════════════════════════════════
     
-    # Extractos abiertos
+    # Extractos abiertos (solo desde CONCILIACION_FECHA_MINIMA)
     cursor.execute('''
         SELECT 
             abs.id,
@@ -190,8 +194,9 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
         FROM account_bank_statement abs
         JOIN account_journal aj ON abs.journal_id = aj.id
         WHERE abs.state = 'open'
+        AND abs.date >= %s
         ORDER BY abs.date DESC
-    ''')
+    ''', (CONCILIACION_FECHA_MINIMA,))
     
     extractos = []
     for row in cursor.fetchall():
@@ -205,7 +210,7 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
             'saldo_final': float(saldo_fin or 0),
         })
     
-    # Movimientos en extractos abiertos
+    # Movimientos en extractos abiertos (solo desde CONCILIACION_FECHA_MINIMA)
     cursor.execute('''
         SELECT 
             abl.id,
@@ -220,8 +225,9 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
         JOIN account_journal aj ON abs.journal_id = aj.id
         LEFT JOIN res_partner rp ON abl.partner_id = rp.id
         WHERE abs.state = 'open'
+        AND abl.date >= %s
         ORDER BY abl.date DESC
-    ''')
+    ''', (CONCILIACION_FECHA_MINIMA,))
     
     movimientos = []
     total_abonos = 0
@@ -244,7 +250,7 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
             'referencia': referencia,
         })
     
-    # Resumen por banco
+    # Resumen por banco (solo desde CONCILIACION_FECHA_MINIMA)
     cursor.execute('''
         SELECT 
             aj.name as banco,
@@ -255,9 +261,10 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
         JOIN account_bank_statement abs ON abl.statement_id = abs.id
         JOIN account_journal aj ON abs.journal_id = aj.id
         WHERE abs.state = 'open'
+        AND abl.date >= %s
         GROUP BY aj.name
         ORDER BY COUNT(*) DESC
-    ''')
+    ''', (CONCILIACION_FECHA_MINIMA,))
     
     resumen_bancos = []
     for row in cursor.fetchall():
