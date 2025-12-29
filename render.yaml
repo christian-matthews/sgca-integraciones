@@ -1,0 +1,74 @@
+# SGCA Integraciones - Render Blueprint
+# =====================================
+# 
+# Crons separados para cada fuente de datos:
+#   1. sgca-bridge-odoo   - Sync FactorIT SpA/Ltda desde Odoo (PostgreSQL)
+#   2. sgca-bridge-skualo - Sync FIDI/CISI/WINGMAN desde Skualo (API REST)
+#
+# Deploy: https://render.com/docs/blueprint-spec
+
+services:
+  # ==========================================================================
+  # CRON ODOO - FactorIT SpA / Ltda
+  # ==========================================================================
+  # Fuente: PostgreSQL Odoo
+  # Empresas: FactorIT SpA, FactorIT Ltda
+  # Velocidad: Rápido (~10 seg)
+  # ==========================================================================
+  - type: cron
+    name: sgca-bridge-odoo
+    env: python
+    region: oregon
+    schedule: "30 10,22 * * *"  # 07:30 y 19:30 Chile (UTC-3)
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m bridge.sync_odoo_to_checks
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      # Odoo PostgreSQL
+      - key: SERVER
+        sync: false
+      - key: PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: PASSWORD
+        sync: false
+      # Supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: LOG_LEVEL
+        value: INFO
+
+  # ==========================================================================
+  # CRON SKUALO - FIDI / CISI / WINGMAN
+  # ==========================================================================
+  # Fuente: API REST Skualo
+  # Empresas: FIDI SpA, CISITEL, The Wingman
+  # Velocidad: Lento (~60-120 seg por empresa)
+  # ==========================================================================
+  - type: cron
+    name: sgca-bridge-skualo
+    env: python
+    region: oregon
+    schedule: "45 10,22 * * *"  # 07:45 y 19:45 Chile (UTC-3) - 15 min después de Odoo
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m bridge.sync_skualo_to_checks
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      # Skualo API
+      - key: SKUALO_API_TOKEN
+        sync: false
+      - key: SKUALO_BASE_URL
+        value: "https://api.skualo.cl"
+      # Supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: LOG_LEVEL
+        value: INFO
+
