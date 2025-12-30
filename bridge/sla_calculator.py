@@ -182,3 +182,8 @@ def get_period_code_monthly(year: int, month: int) -> str:
     Formato: YYYY-MM
     """
     return f"{year}-{month:02d}"
+
+
+
+
+

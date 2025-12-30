@@ -28,7 +28,7 @@ Uso:
 import os
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
@@ -58,6 +58,8 @@ def _get_tenants() -> Dict[str, Dict]:
         except FileNotFoundError:
             _tenants_cache = {}
     return _tenants_cache
+
+
 
 
 # Mapeo de tipos DTE
@@ -247,24 +249,44 @@ def obtener_pendientes_empresa(empresa_id: str) -> Dict[str, Any]:
     }
     
     # ═══════════════════════════════════════════════════════════════════
-    # 2. DOCUMENTOS POR CONTABILIZAR
+    # 2. DOCUMENTOS POR CONTABILIZAR (optimizado: libro de compras 2025)
     # ═══════════════════════════════════════════════════════════════════
     pendientes_contabilizar = []
     
+    # Obtener libro de compras de todo 2025 (12 llamadas vs N por DTE)
+    folios_contabilizados = set()
+    meses_consultados = 0
+    
+    hoy = datetime.now()
+    mes_actual = hoy.month
+    
+    # Consultar desde enero hasta el mes actual
+    for mes in range(1, mes_actual + 1):
+        periodo = f'2025{mes:02d}'
+        
+        libro = _api_get(rut, f'/contabilidad/reportes/librocompras/{periodo}', {'IdSucursal': 0})
+        
+        if libro and isinstance(libro, list):
+            meses_consultados += 1
+            for item in libro:
+                # Campo es 'NumDoc' (mayúscula) en libro de compras
+                folio = item.get('NumDoc') or item.get('numDoc') or item.get('folio')
+                if folio:
+                    folios_contabilizados.add(str(folio))
+    
+    # Cruzar: DTEs aceptados que NO están en el libro = pendientes
     for dte in aceptados:
-        tipo_dte = dte.get('tipo_id')
-        folio = dte.get('folio')
-        tipo_interno = TIPO_DTE_A_INTERNO.get(tipo_dte, 'FACE')
+        folio = str(dte.get('folio', ''))
+        tipo_interno = TIPO_DTE_A_INTERNO.get(dte.get('tipo_id'), 'FACE')
         
-        # Verificar si existe en documentos
-        doc = _api_get(rut, f'/documentos/{tipo_interno}/{folio}')
-        
-        if not doc:
+        if folio and folio not in folios_contabilizados:
             pendientes_contabilizar.append({**dte, 'tipo_interno': tipo_interno})
     
     resultado['pendientes_contabilizar'] = {
         'cantidad': len(pendientes_contabilizar),
         'documentos': pendientes_contabilizar,
+        '_libro_compras_count': len(folios_contabilizados),
+        '_meses_consultados': meses_consultados
     }
     
     # ═══════════════════════════════════════════════════════════════════
@@ -408,4 +430,9 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+
+
+
 

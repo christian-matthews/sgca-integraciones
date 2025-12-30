@@ -77,7 +77,8 @@ Solicitar a: **soporte@skualo.cl**
 | `GET /{RUT}/contabilidad/reportes/analisisporauxiliar/{idAuxiliar}` | PATH: `idAuxiliar` (RUT) | ✅ |
 | `GET /{RUT}/contabilidad/reportes/analisisporcuenta/{idCuenta}` | PATH: `idCuenta`, QUERY: `fechaCorte` | ✅ |
 | `GET /{RUT}/contabilidad/reportes/libromayor` | QUERY: ver abajo | ✅ |
-| `GET /{RUT}/contabilidad/reportes/resultados` | QUERY: `fechaCorte` | ⚠️ Requiere config |
+| `GET /{RUT}/contabilidad/reportes/resultados` | QUERY: `fechaCorte` (obligatorio) | ✅ |
+| `GET /{RUT}/contabilidad/reportes/librocompras/{idPeriodo}` | PATH: `idPeriodo`, QUERY: `IdSucursal` | ✅ |
 
 **Formatos de parámetros:**
 
@@ -95,7 +96,74 @@ GET /{RUT}/contabilidad/reportes/analisisporauxiliar/76965744-4
 GET /{RUT}/contabilidad/reportes/analisisporcuenta/1109003?fechaCorte=2025-11-30&soloPendientes=false
 ```
 
-### 3.3 Libro Mayor ✅
+### 3.3 Estado de Resultados ✅
+
+```
+GET /{RUT}/contabilidad/reportes/resultados
+    ?fechaCorte=2025-12-31
+    &agrupadoPor=0
+    &incluyeAjusteTributario=false
+```
+
+| Parámetro | Requerido | Descripción |
+|-----------|-----------|-------------|
+| `fechaCorte` | ✅ **Obligatorio** | Fecha de corte (yyyy-mm-dd) |
+| `agrupadoPor` | ❌ | 0 = Sin agrupar |
+| `incluyeAjusteTributario` | ❌ | true/false |
+
+**Estructura respuesta (por cuenta y mes):**
+```json
+{
+  "IDCuenta": "4101001",
+  "Cuenta": "Ventas Del Giro",
+  "Enero": 19743604.0,
+  "Febrero": 12050378.0,
+  ...
+  "Diciembre": 156653044.0,
+  "TOTAL": 1452124383.0
+}
+```
+
+**Nota:** Sin `fechaCorte` retorna 400 "No hay información a listar".
+
+---
+
+### 3.4 Libro de Compras ✅
+
+```
+GET /{RUT}/contabilidad/reportes/librocompras/{idPeriodo}?IdSucursal=0
+```
+
+| Parámetro | Requerido | Descripción |
+|-----------|-----------|-------------|
+| `idPeriodo` | ✅ PATH | Período (yyyyMM), ej: `202512` |
+| `IdSucursal` | ✅ QUERY | 0 = Todas las sucursales |
+
+**Estructura respuesta:**
+```json
+{
+  "IDSucursal": 1,
+  "Sucursal": "Casa Matriz",
+  "Fecha": "2025-09-11T00:00:00-03:00",
+  "Numero": 97,
+  "IDTipoDT": 33,
+  "TipoDoc": "Factura Compra Electrónica",
+  "NumDoc": 5396263,
+  "Emision": "2025-08-28T00:00:00-04:00",
+  "IDAuxiliar": "77261280-K",
+  "Auxiliar": "FALABELLA RETAIL S.A.",
+  "Neto": 50336.0,
+  "Exento": 0.0,
+  "IVACD": 9564.0,
+  "Total": 59900.0
+}
+```
+
+**Uso:** Cruzar con DTEs recibidos para detectar pendientes de contabilizar.
+
+---
+
+### 3.5 Libro Mayor ✅
 
 ```
 GET /{RUT}/contabilidad/reportes/libromayor
@@ -420,12 +488,13 @@ GET /{RUT}/sii/dte/recibidos?PageSize=100
 | **Webhooks** | `/integraciones/webhooks` POST | ✅ | **Crear webhook** |
 | **Webhooks** | `/integraciones/webhooks/{id}` DELETE | ✅ | **Eliminar webhook** |
 | Contabilidad | `/contabilidad/reportes/libromayor` | ✅ | Libro mayor |
+| **Contabilidad** | `/contabilidad/reportes/resultados` | ✅ | **Estado de Resultados** (requiere fechaCorte) |
+| **Contabilidad** | `/contabilidad/reportes/librocompras/{periodo}` | ✅ | **Libro de Compras** |
 
 ### Pendientes ⚠️
 
 | Módulo | Endpoint | Estado | Nota |
 |--------|----------|--------|------|
-| Contabilidad | `/contabilidad/reportes/resultados` | ⚠️ | Requiere config en Skualo |
 | Documentos | `/documentos?{filtros}` | ⚠️ | Filtros no funcionan |
 | Documentos | `/documentos/{tipo}/pendientes` | ⚠️ | Pendientes de pago, no de contabilizar |
 

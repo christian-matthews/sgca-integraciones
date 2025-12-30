@@ -120,3 +120,8 @@ Este archivo se genera automáticamente desde `sgca-core/scripts/seed_factorit_t
 - ❌ NO se modificó `sgca-core/src/engine/*`
 - ✅ Bridge es 100% satélite, escribe solo a `expected_item_checks`
 - ✅ Autocierre es seguro (reabre si backlog > 0)
+
+
+
+
+

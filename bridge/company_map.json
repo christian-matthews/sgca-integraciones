@@ -24,5 +24,44 @@
       "enabled": false,
       "rut": null
     }
+  },
+  "FIDI": {
+    "tenant_id": "11111111-1111-1111-1111-111111111111",
+    "company_id": "9a749770-47df-45e8-a4cc-d219ece4baa2",
+    "nombre": "Fidi SpA",
+    "odoo": {
+      "enabled": false,
+      "db_name": null
+    },
+    "skualo": {
+      "enabled": true,
+      "rut": "77285542-7"
+    }
+  },
+  "CISI": {
+    "tenant_id": "11111111-1111-1111-1111-111111111111",
+    "company_id": "abee1082-5228-4beb-9c93-9cccdaecf219",
+    "nombre": "CISITEL SpA",
+    "odoo": {
+      "enabled": false,
+      "db_name": null
+    },
+    "skualo": {
+      "enabled": true,
+      "rut": "77949039-4"
+    }
+  },
+  "WINGMAN": {
+    "tenant_id": "11111111-1111-1111-1111-111111111111",
+    "company_id": "7edb0063-817a-4626-9d6e-7c5b8c5f276c",
+    "nombre": "The Wingman SpA",
+    "odoo": {
+      "enabled": false,
+      "db_name": null
+    },
+    "skualo": {
+      "enabled": true,
+      "rut": "77285645-8"
+    }
   }
 }
