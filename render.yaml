@@ -24,7 +24,7 @@ services:
     startCommand: python -m bridge.sync_odoo_to_checks
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11"
+        value: "3.11.7"
       # Odoo PostgreSQL
       - key: SERVER
         sync: false
@@ -58,7 +58,7 @@ services:
     startCommand: python -m bridge.sync_skualo_to_checks
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11"
+        value: "3.11.7"
       # Skualo API
       - key: SKUALO_API_TOKEN
         sync: false
