@@ -201,11 +201,16 @@ def obtener_pendientes_empresa(empresa_id: str) -> Dict[str, Any]:
     periodo = datetime.now().strftime('%Y%m')
     
     # ═══════════════════════════════════════════════════════════════════
-    # 1. DOCUMENTOS RECIBIDOS SII
+    # 1. DOCUMENTOS RECIBIDOS SII (solo año actual)
     # ═══════════════════════════════════════════════════════════════════
-    dtes = _api_get_all(rut, '/sii/dte/recibidos')
+    dtes_raw = _api_get_all(rut, '/sii/dte/recibidos')
     
     hoy = datetime.now()
+    anio_actual = str(hoy.year)
+    
+    # Filtrar solo DTEs del año actual
+    dtes = [d for d in dtes_raw if d.get('fechaEmision', '').startswith(anio_actual)]
+    
     pendientes_aceptar = []
     aceptados = []
     
