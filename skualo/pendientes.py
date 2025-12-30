@@ -72,6 +72,9 @@ TIPO_DTE_A_INTERNO = {
     110: 'FEXP',  # Factura de Exportación Electrónica
 }
 
+# Tipos DTE a excluir del análisis de pendientes (no requieren contabilización)
+TIPOS_DTE_EXCLUIR = {52}  # Guías de Despacho
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # HELPERS API
@@ -280,9 +283,16 @@ def obtener_pendientes_empresa(empresa_id: str) -> Dict[str, Any]:
                     folios_contabilizados.add(str(folio))
     
     # Cruzar: DTEs aceptados que NO están en el libro = pendientes
+    # Excluir Guías de Despacho (tipo 52) que no requieren contabilización
     for dte in aceptados:
+        tipo_id = dte.get('tipo_id')
+        
+        # Omitir tipos excluidos (Guías de Despacho, etc.)
+        if tipo_id in TIPOS_DTE_EXCLUIR:
+            continue
+        
         folio = str(dte.get('folio', ''))
-        tipo_interno = TIPO_DTE_A_INTERNO.get(dte.get('tipo_id'), 'FACE')
+        tipo_interno = TIPO_DTE_A_INTERNO.get(tipo_id, 'FACE')
         
         if folio and folio not in folios_contabilizados:
             pendientes_contabilizar.append({**dte, 'tipo_interno': tipo_interno})
