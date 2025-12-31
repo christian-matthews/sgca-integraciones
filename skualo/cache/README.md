@@ -22,3 +22,4 @@ Este directorio almacena caché de DTEs procesados para evitar consultas repetid
 
 Los registros más antiguos de 90 días se pueden limpiar.
 
+
