@@ -11,8 +11,9 @@ from dotenv import load_dotenv
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import numbers, Font, Alignment, PatternFill, Border, Side
 
-# Carpeta para archivos generados
-OUTPUT_DIR = "generados"
+# Carpeta para archivos generados (relativo al script)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_DIR = os.path.join(SCRIPT_DIR, "generados")
 
 load_dotenv()
 
@@ -20,7 +21,6 @@ API_BASE = "https://api.skualo.cl"
 TOKEN = os.getenv("SKUALO_API_TOKEN")
 
 # Cargar tenants
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TENANTS_FILE = os.path.join(SCRIPT_DIR, "..", "config", "tenants.json")
 with open(TENANTS_FILE, "r") as f:
     TENANTS = json.load(f)
@@ -1400,16 +1400,25 @@ def crear_estados_financieros_comparativos(tenant_rut, periodos, writer):
             col_idx += 1
 
 
-def main():
+def generar_reporte(tenant_key: str, fecha_corte: str) -> str:
+    """
+    Genera reporte de Balance + Análisis por Cuenta.
+    
+    Args:
+        tenant_key: Alias de empresa (FIDI, CISI)
+        fecha_corte: Fecha de corte en formato YYYY-MM-DD
+    
+    Returns:
+        Path del archivo generado
+    """
     print("═" * 60)
     print("   BALANCE + ANÁLISIS POR CUENTA A EXCEL")
     print("═" * 60)
 
-    # Configuración
-    tenant_key = "FIDI"
+    # Configuración desde parámetros
     tenant = TENANTS[tenant_key]
-    id_periodo = "202512"
-    fecha_corte = "2025-12-31"
+    # Extraer período de fecha_corte (YYYYMM)
+    id_periodo = fecha_corte[:4] + fecha_corte[5:7]
 
     # 1. Obtener Balance
     print("\n📊 Obteniendo Balance Tributario...")
@@ -1417,7 +1426,7 @@ def main():
     
     if not balance:
         print("   ❌ Error obteniendo balance")
-        return
+        raise ValueError(f"No se pudo obtener balance para {tenant_key}")
 
     # Filtrar cuentas con saldo != 0
     balance_filtrado = [
@@ -1657,6 +1666,19 @@ def main():
         
     print(f"\n💾 Guardado: {filename}")
     print("\n" + "═" * 60)
+    
+    return filename
+
+
+def main():
+    """CLI principal."""
+    import sys
+    
+    # Defaults
+    tenant_key = sys.argv[1] if len(sys.argv) > 1 else "FIDI"
+    fecha_corte = sys.argv[2] if len(sys.argv) > 2 else "2025-12-31"
+    
+    generar_reporte(tenant_key, fecha_corte)
 
 
 if __name__ == "__main__":
