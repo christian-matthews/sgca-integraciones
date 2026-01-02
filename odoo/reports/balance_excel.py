@@ -77,6 +77,9 @@ ESTILOS = {
     "formato_miles": '#,##0'
 }
 
+# Fecha de inicio para reportes (coherencia con período de control)
+FECHA_INICIO_REPORTE = '2025-01-01'
+
 CLASIFICACION_CUENTAS = {
     "activo_corriente": {"nombre": "Activo Corriente", "prefijos": ["11"]},
     "activo_no_corriente": {"nombre": "Activo No Corriente", "prefijos": ["12", "13", "14"]},
@@ -120,12 +123,13 @@ def obtener_balance(cursor, fecha_hasta):
     JOIN account_account aa ON aml.account_id = aa.id
     JOIN account_move am ON aml.move_id = am.id
     WHERE am.state = 'posted'
+      AND aml.date >= %s
       AND aml.date <= %s
     GROUP BY aa.id, aa.code, aa.name, aa.user_type_id
     HAVING SUM(aml.debit) != 0 OR SUM(aml.credit) != 0
     ORDER BY aa.code
     """
-    cursor.execute(query, (fecha_hasta,))
+    cursor.execute(query, (FECHA_INICIO_REPORTE, fecha_hasta))
     
     cuentas = []
     for row in cursor.fetchall():
@@ -177,10 +181,11 @@ def obtener_movimientos_cuenta(cursor, codigo_cuenta, fecha_hasta):
     LEFT JOIN res_partner rp ON aml.partner_id = rp.id
     WHERE aa.code = %s
       AND am.state = 'posted'
+      AND aml.date >= %s
       AND aml.date <= %s
     ORDER BY aml.date DESC, am.name
     """
-    cursor.execute(query, (codigo_cuenta, fecha_hasta))
+    cursor.execute(query, (codigo_cuenta, FECHA_INICIO_REPORTE, fecha_hasta))
     return cursor.fetchall()
 
 
