@@ -20,7 +20,9 @@ API_BASE = "https://api.skualo.cl"
 TOKEN = os.getenv("SKUALO_API_TOKEN")
 
 # Cargar tenants
-with open("tenants.json", "r") as f:
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+TENANTS_FILE = os.path.join(SCRIPT_DIR, "..", "config", "tenants.json")
+with open(TENANTS_FILE, "r") as f:
     TENANTS = json.load(f)
 
 
@@ -53,6 +55,65 @@ def sanitize_sheet_name(codigo, nombre):
     for char in ['\\', '/', '*', '?', '[', ']', ':']:
         name = name.replace(char, '')
     return name[:31]
+
+
+def generar_periodos_trimestrales(id_periodo_actual: str) -> list:
+    """
+    Genera períodos trimestrales hasta el período actual.
+    Trimestres: Mar (Q1), Jun (Q2), Sep (Q3), Dic (Q4)
+    Si el trimestre no está completo, usa el último mes disponible.
+    
+    Args:
+        id_periodo_actual: Período en formato YYYYMM (ej: "202512")
+    
+    Returns:
+        Lista de tuplas [(id_periodo, nombre), ...]
+    """
+    TRIMESTRES = [
+        (3, "Mar"),   # Q1 - Marzo
+        (6, "Jun"),   # Q2 - Junio  
+        (9, "Sep"),   # Q3 - Septiembre
+        (12, "Dic")   # Q4 - Diciembre
+    ]
+    
+    anio_actual = int(id_periodo_actual[:4])
+    mes_actual = int(id_periodo_actual[4:])
+    
+    periodos = []
+    
+    for mes_trimestre, nombre_mes in TRIMESTRES:
+        if mes_trimestre <= mes_actual:
+            # Trimestre completo
+            id_periodo = f"{anio_actual}{mes_trimestre:02d}"
+            nombre = f"{nombre_mes} {anio_actual}"
+            periodos.append((id_periodo, nombre))
+        elif mes_trimestre == TRIMESTRES[-1][0] and mes_actual < 12:
+            # Si no llegamos a diciembre, agregar el mes actual como cierre
+            # Solo si el mes actual es posterior al último trimestre agregado
+            if periodos and int(periodos[-1][0][4:]) < mes_actual:
+                NOMBRES_MESES = {
+                    1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun",
+                    7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic"
+                }
+                nombre = f"{NOMBRES_MESES[mes_actual]} {anio_actual}"
+                periodos.append((id_periodo_actual, nombre))
+            break
+    
+    # Si el mes actual no es fin de trimestre pero es > último trimestre, agregarlo
+    ultimo_trimestre_mes = 0
+    for mes_t, _ in TRIMESTRES:
+        if mes_t <= mes_actual:
+            ultimo_trimestre_mes = mes_t
+    
+    if mes_actual > ultimo_trimestre_mes and mes_actual not in [3, 6, 9, 12]:
+        NOMBRES_MESES = {
+            1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun",
+            7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic"
+        }
+        nombre = f"{NOMBRES_MESES[mes_actual]} {anio_actual}"
+        periodos.append((id_periodo_actual, nombre))
+    
+    return periodos
 
 
 # Definición de agrupaciones para Estado de Resultados
@@ -1347,8 +1408,8 @@ def main():
     # Configuración
     tenant_key = "FIDI"
     tenant = TENANTS[tenant_key]
-    id_periodo = "202511"
-    fecha_corte = "2025-11-30"
+    id_periodo = "202512"
+    fecha_corte = "2025-12-31"
 
     # 1. Obtener Balance
     print("\n📊 Obteniendo Balance Tributario...")
@@ -1401,13 +1462,9 @@ def main():
         print("\n📈 Generando Resumen (Balance + EERR + KPIs)...")
         crear_resumen(balance, writer, tenant["nombre"], id_periodo)
         
-        # 4. Crear Estados Financieros Comparativos (Marzo, Junio, Noviembre)
+        # 4. Crear Estados Financieros Comparativos (Trimestres: Mar, Jun, Sep, Dic)
         print("\n📊 Generando Estados Financieros Comparativos...")
-        periodos_comparar = [
-            ("202503", "Mar 2025"),
-            ("202506", "Jun 2025"),
-            ("202511", "Nov 2025")
-        ]
+        periodos_comparar = generar_periodos_trimestrales(id_periodo)
         crear_estados_financieros_comparativos(tenant["rut"], periodos_comparar, writer)
         
         # 5. Crear Documentación
@@ -1496,9 +1553,9 @@ def main():
                 # Formatear hoja de análisis
                 ws_cuenta = writer.sheets[sheet_name]
                 
-                # A1: Hipervínculo de retorno
-                ws_cuenta.cell(row=1, column=1).value = "← Volver al Resumen"
-                ws_cuenta.cell(row=1, column=1).hyperlink = "#'Resumen'!A1"
+                # A1: Hipervínculo de retorno al Balance Tributario
+                ws_cuenta.cell(row=1, column=1).value = "← Volver al Balance Tributario"
+                ws_cuenta.cell(row=1, column=1).hyperlink = "#'Balance Tributario'!A1"
                 ws_cuenta.cell(row=1, column=1).style = "Hyperlink"
                 
                 # A2: Título con cuenta y período
