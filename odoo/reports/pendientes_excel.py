@@ -20,9 +20,16 @@ import pandas as pd
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 
-# Agregar path para importar pendientes
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from pendientes import obtener_pendientes_empresa, DATABASES
+# Agregar paths para imports
+SCRIPT_DIR = Path(__file__).parent  # odoo/reports/
+ODOO_DIR = SCRIPT_DIR.parent  # odoo/
+INTEGRACIONES_DIR = ODOO_DIR.parent  # sgca-integraciones/
+
+# Agregar sgca-integraciones al path para imports como "odoo.pendientes"
+if str(INTEGRACIONES_DIR) not in sys.path:
+    sys.path.insert(0, str(INTEGRACIONES_DIR))
+
+from odoo.pendientes import obtener_pendientes_empresa, DATABASES
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONFIGURACIÓN - PALETA ART-002 (igual que Balance)
