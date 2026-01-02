@@ -12,7 +12,8 @@
 | **Odoo** | PostgreSQL directo | FactorIT SpA, FactorIT Ltda | ✅ Producción |
 | **Fintoc** | API REST | - | 🔜 Pendiente |
 | **SII** | Portal + API | - | 🔜 Pendiente |
-| **Clay** | ¿? | - | 🔜 Pendiente |
+| **Clay** | API REST | - | 🔜 Pendiente |
+| **Transtecnia** | ¿API? ¿Export? | - | 🔍 Investigando |
 
 ---
 
