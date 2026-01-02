@@ -109,6 +109,18 @@ def reporte_pendientes(empresa: str):
         
         filepath = generar(empresa_id)
         
+        # Verificar que el archivo existe y tiene contenido
+        if not os.path.exists(filepath):
+            print(f"❌ Archivo no existe: {filepath}")
+            return jsonify({"error": "Archivo no generado"}), 500
+        
+        file_size = os.path.getsize(filepath)
+        print(f"✅ Archivo listo: {filepath} ({file_size} bytes)")
+        
+        if file_size == 0:
+            print(f"❌ Archivo vacío: {filepath}")
+            return jsonify({"error": "Archivo generado vacío"}), 500
+        
         return send_file(
             filepath,
             as_attachment=True,
@@ -176,6 +188,18 @@ def reporte_financiero():
         else:
             generar = get_odoo_balance()
             filepath = generar(empresa_id, fecha_corte)
+        
+        # Verificar que el archivo existe y tiene contenido
+        if not os.path.exists(filepath):
+            print(f"❌ Archivo no existe: {filepath}")
+            return jsonify({"error": "Archivo no generado"}), 500
+        
+        file_size = os.path.getsize(filepath)
+        print(f"✅ Archivo listo: {filepath} ({file_size} bytes)")
+        
+        if file_size == 0:
+            print(f"❌ Archivo vacío: {filepath}")
+            return jsonify({"error": "Archivo generado vacío"}), 500
         
         return send_file(
             filepath,
