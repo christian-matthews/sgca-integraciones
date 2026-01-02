@@ -181,50 +181,60 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
     }
     
     # ═══════════════════════════════════════════════════════════════════
-    # 2. ASIENTOS POR CONTABILIZAR (state=draft)
+    # 2. FACTURAS POR CONTABILIZAR
     # ═══════════════════════════════════════════════════════════════════
-    cursor.execute('''
+    # CRITERIO CORRECTO: Documentos SII aceptados que NO tienen asiento
+    # contable asociado. Se verifica:
+    # - invoice_id IS NULL (sin vínculo directo)
+    # - Y NO existe un asiento posted con ese folio en la referencia
+    # ═══════════════════════════════════════════════════════════════════
+    
+    cursor.execute(f'''
         SELECT 
-            am.id,
-            am.date,
-            aj.name as diario,
-            am.name as referencia,
-            rp.name as tercero,
-            am.ref as descripcion
-        FROM account_move am
-        JOIN account_journal aj ON am.journal_id = aj.id
-        LEFT JOIN res_partner rp ON am.partner_id = rp.id
-        WHERE am.state = 'draft'
-        ORDER BY am.date DESC
+            a.id,
+            a.date,
+            b.doc_code_prefix as tipo,
+            a.number as folio,
+            a.new_partner as proveedor,
+            a.amount
+        FROM mail_message_dte_document a
+        JOIN sii_document_class b ON a.document_class_id = b.id
+        WHERE a.state = 'accepted'
+          AND a.invoice_id IS NULL
+          AND a.date >= '{CONCILIACION_FECHA_MINIMA}'
+          AND NOT EXISTS (
+              SELECT 1 FROM account_move am
+              WHERE am.state = 'posted'
+                AND am.ref LIKE '%' || a.number::text || '%'
+          )
+        ORDER BY a.date DESC
     ''')
     
-    asientos_draft = []
+    facturas_sin_contabilizar = []
     for row in cursor.fetchall():
-        asiento_id, fecha, diario, referencia, tercero, descripcion = row
-        asientos_draft.append({
-            'id': asiento_id,
+        doc_id, fecha, tipo, folio, proveedor, monto = row
+        facturas_sin_contabilizar.append({
+            'id': doc_id,
             'fecha': fecha,
-            'diario': diario,
-            'referencia': referencia,
-            'tercero': tercero,
-            'descripcion': descripcion,
+            'tipo': tipo,
+            'folio': folio,
+            'proveedor': proveedor,
+            'monto': float(monto) if monto else 0,
         })
     
-    # Resumen por diario
-    cursor.execute('''
-        SELECT aj.name as diario, COUNT(*) as cantidad
-        FROM account_move am
-        JOIN account_journal aj ON am.journal_id = aj.id
-        WHERE am.state = 'draft'
-        GROUP BY aj.name
-        ORDER BY COUNT(*) DESC
-    ''')
-    resumen_diarios = {row[0]: row[1] for row in cursor.fetchall()}
+    # Resumen por tipo de documento
+    resumen_tipos = {}
+    for f in facturas_sin_contabilizar:
+        tipo = f['tipo'] or 'Otro'
+        resumen_tipos[tipo] = resumen_tipos.get(tipo, 0) + 1
     
     resultado['pendientes_contabilizar'] = {
-        'cantidad': len(asientos_draft),
-        'por_diario': resumen_diarios,
-        'asientos': asientos_draft,
+        'cantidad': len(facturas_sin_contabilizar),
+        'por_tipo': resumen_tipos,
+        'total_monto': sum(f['monto'] for f in facturas_sin_contabilizar),
+        'facturas': facturas_sin_contabilizar,
+        # Alias para compatibilidad
+        'asientos': facturas_sin_contabilizar,
     }
     
     # ═══════════════════════════════════════════════════════════════════
