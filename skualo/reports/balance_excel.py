@@ -22,8 +22,18 @@ TOKEN = os.getenv("SKUALO_API_TOKEN")
 
 # Cargar tenants
 TENANTS_FILE = os.path.join(SCRIPT_DIR, "..", "config", "tenants.json")
-with open(TENANTS_FILE, "r") as f:
-    TENANTS = json.load(f)
+try:
+    with open(TENANTS_FILE, "r") as f:
+        TENANTS = json.load(f)
+except FileNotFoundError:
+    print(f"⚠️ Archivo no encontrado: {TENANTS_FILE}")
+    print(f"   SCRIPT_DIR: {SCRIPT_DIR}")
+    # Fallback con datos hardcoded
+    TENANTS = {
+        "FIDI": {"rut": "77285542-7", "nombre": "Fidi SpA", "activo": True},
+        "CISI": {"rut": "77949039-4", "nombre": "CISITEL SpA", "activo": True},
+        "WINGMAN": {"rut": "77285645-8", "nombre": "The Wingman SpA", "activo": True},
+    }
 
 
 def api_get(tenant_rut, path):
