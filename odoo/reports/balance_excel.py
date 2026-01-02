@@ -488,10 +488,14 @@ def generar_reporte(db_name: str, fecha_corte: str) -> str:
             df_mov = pd.DataFrame(movimientos, columns=['Fecha', 'Asiento', 'Descripción', 'Tercero', 'Debe', 'Haber'])
             df_mov['Fecha'] = df_mov['Fecha'].astype(str)
             
+            # Convertir Debe y Haber a float (vienen como Decimal de PostgreSQL)
+            df_mov['Debe'] = df_mov['Debe'].apply(lambda x: float(x) if x else 0.0)
+            df_mov['Haber'] = df_mov['Haber'].apply(lambda x: float(x) if x else 0.0)
+            
             saldo_acum = []
-            acum = 0
+            acum = 0.0
             for _, row in df_mov.iterrows():
-                acum += float(row['Debe'] or 0) - float(row['Haber'] or 0)
+                acum += row['Debe'] - row['Haber']
                 saldo_acum.append(acum)
             df_mov['Saldo'] = saldo_acum
             
