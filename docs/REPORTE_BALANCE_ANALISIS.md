@@ -1,13 +1,14 @@
 # Reporte Balance + Análisis por Cuenta
 
 > **Versión:** 2.0  
-> **Última actualización:** 2 Enero 2026
+> **Última actualización:** 2 Enero 2026  
+> **Artefacto:** [ART-001](../../sgca-core/artefactos/balance_analisis/SPEC.md)
 
 ---
 
 ## Descripción
 
-Genera un reporte Excel completo con:
+Implementación del artefacto ART-001. Genera un reporte Excel completo con:
 - **Resumen**: Balance Clasificado + Estado de Resultados + KPIs
 - **EEFF Comparativos**: Trimestres (Mar/Jun/Sep/Dic) del año
 - **Documentación**: Agrupaciones y fórmulas utilizadas
@@ -21,7 +22,7 @@ Genera un reporte Excel completo con:
 ### Skualo
 
 ```bash
-cd sgca-integraciones/skualo/scripts
+cd sgca-integraciones/skualo/reports
 python3 balance_excel.py
 ```
 
@@ -35,8 +36,8 @@ fecha_corte = "2025-12-31"   # Fecha de corte YYYY-MM-DD
 ### Odoo
 
 ```bash
-cd sgca-integraciones/odoo/scripts
-python3 balance_excel_odoo.py  # TODO: Implementar
+cd sgca-integraciones/odoo/reports
+python3 balance_excel.py  # TODO: Implementar según ART-001
 ```
 
 ---

@@ -1,36 +1,49 @@
-# SGCA - Sistema de Gestión y Control Administrativo
+# SGCA Integraciones
 
-Sistema modular para integración con APIs de ERPs (Skualo, Odoo/FactorIT).
+Sistema modular para integración con APIs de ERPs (Skualo, Odoo/FactorIT, Clay).
+
+## 🏗️ Arquitectura
+
+Los **artefactos** (definiciones de reportes) viven en `sgca-core/artefactos/`.
+Las **implementaciones** por ERP viven aquí en `{erp}/reports/`.
+
+```
+sgca-core/artefactos/           ← CONTRATOS (Qué debe contener)
+    └── balance_analisis/SPEC.md
+
+sgca-integraciones/             ← IMPLEMENTACIONES (Cómo obtener datos)
+    ├── skualo/reports/
+    ├── odoo/reports/
+    └── clay/reports/           (futuro)
+```
 
 ## 📁 Estructura
 
 ```
-SGCA/
+sgca-integraciones/
 ├── skualo/                    # API Skualo ERP
 │   ├── __init__.py           # Módulo principal
 │   ├── cli.py                # CLI de comandos
 │   ├── config.py             # Gestión de configuración
 │   ├── control.py            # Clase SkualoControl
+│   ├── pendientes.py         # Pendientes para Bridge
 │   ├── config/               # Configuraciones
-│   │   ├── tenants.json      # Empresas disponibles
-│   │   └── empresas/         # Config por empresa (*.json)
-│   ├── docs/                 # Documentación
-│   └── scripts/
-│       ├── balance_excel_v2.py  # Balance + EERR Excel
-│       ├── pendientes.py        # Reporte pendientes JSON
-│       └── control_pendientes.py
+│   │   └── tenants.json      # Empresas disponibles
+│   ├── reports/              # 📊 IMPLEMENTACIÓN DE ARTEFACTOS
+│   │   ├── balance_excel.py  # ART-001: Balance + Análisis
+│   │   └── generados/        # Archivos Excel generados
+│   ├── scripts/              # Scripts auxiliares
+│   └── docs/                 # Documentación técnica
 │
 ├── odoo/                      # PostgreSQL Odoo (FactorIT)
 │   ├── __init__.py           # Módulo principal
-│   ├── test_connection.py    # Test de conexión
-│   ├── pendientes.py         # Reporte pendientes JSON
-│   ├── balance_excel.py      # Balance + EERR Excel
-│   ├── bancos_pendientes.py  # Movimientos bancarios
+│   ├── pendientes.py         # Pendientes para Bridge
+│   ├── reports/              # 📊 IMPLEMENTACIÓN DE ARTEFACTOS (TODO)
 │   └── README.md
 │
+├── bridge/                    # Sincronización → Supabase
 ├── common/                    # Código compartido
-├── generados/                 # Archivos Excel (ignorados)
-├── temp/                      # Archivos JSON temporales
+├── docs/                      # Documentación consolidada
 ├── .env                       # Variables de entorno
 └── requirements.txt
 ```
@@ -105,28 +118,32 @@ python -m odoo.pendientes                     # Todas las empresas
 
 ## 📊 Balance + Estado de Resultados (Excel)
 
+> **Especificación:** [`sgca-core/artefactos/balance_analisis/SPEC.md`](../sgca-core/artefactos/balance_analisis/SPEC.md)
+
 ### Skualo
 
 ```bash
-python -m skualo.scripts.balance_excel_v2
+cd skualo/reports
+python balance_excel.py
 ```
 
-### Odoo (FactorIT)
+**Configuración:** Editar `tenant_key`, `id_periodo`, `fecha_corte` en el script.
+
+### Odoo (FactorIT) - TODO
 
 ```bash
-python -m odoo.balance_excel FactorIT         # FactorIT SpA
-python -m odoo.balance_excel FactorIT2        # FactorIT Ltda
-python -m odoo.balance_excel FactorIT 2025-11-30  # Con fecha corte
+cd odoo/reports
+python balance_excel.py  # Por implementar
 ```
 
-### Características
+### Características (ART-001)
 
 - ✅ Balance Clasificado (Activos, Pasivos, Patrimonio)
 - ✅ Estado de Resultados (Ingresos, Costos, Gastos, Resultado Neto)
-- ✅ **Resultado del Período incluido en Patrimonio**
-- ✅ Verificación de Cuadratura: Activos = Pasivos + Patrimonio
+- ✅ EEFF Comparativos (Trimestres: Mar/Jun/Sep/Dic)
 - ✅ KPIs Financieros (Margen Bruto, ROA, ROE)
-- ✅ Hojas de detalle por cuenta con hipervínculos
+- ✅ Hojas de análisis por cuenta con hipervínculos
+- ✅ Navegación: Cuentas → Balance Tributario
 
 ---
 

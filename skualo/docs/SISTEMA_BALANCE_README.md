@@ -1,5 +1,14 @@
 # Sistema de Generación de Estados Financieros
 
+> ⚠️ **DEPRECADO** - Este documento ha sido reemplazado por:
+> - **Especificación:** [`sgca-core/artefactos/balance_analisis/SPEC.md`](../../../../sgca-core/artefactos/balance_analisis/SPEC.md)
+> - **Implementación:** [`sgca-integraciones/docs/REPORTE_BALANCE_ANALISIS.md`](../../docs/REPORTE_BALANCE_ANALISIS.md)
+> - **Script:** `skualo/reports/balance_excel.py` (movido desde `scripts/`)
+
+---
+
+## Contenido Original (Histórico)
+
 Sistema parametrizable para generar reportes financieros desde Skualo ERP.
 
 ---
