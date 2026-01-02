@@ -1,123 +1,234 @@
 # TRANSTECNIA API - Documentación SGCA
 
-> **Estado:** 🔍 En Investigación  
+> **Estado:** ✅ Documentado  
+> **Fuente original:** `APIs/TRANSTECNIA_API_BIBLIA_SGCA.md`  
 > **Última actualización:** 2 Enero 2026
 
 ---
 
-## 1. Información General
+## 1. Introducción
 
-**Transtecnia** es una empresa chilena que provee soluciones de:
-- Facturación Electrónica (DTE)
-- Contabilidad Digital
-- Libros Electrónicos
-- Software Contable
+**Transtecnia** provee el **Ecosistema Fintech Contable (EFC)** con API REST para:
+- Lectura de datos base (Plan de cuentas, Centros de costo, Terceros)
+- Generación de reportes (Libro Diario, Mayor, Balance)
+- Carga de comprobantes contables (Vouchers)
 
-**Sitio web:** [transtecnia.cl](https://transtecnia.cl)
+### Ambientes
 
----
-
-## 2. Estado de la API
-
-### ⚠️ API No Documentada Públicamente
-
-A la fecha, **no existe documentación pública** de una API REST para Transtecnia.
-
-**Opciones de integración conocidas:**
-- Exportación manual de archivos (Excel, XML)
-- Posible API privada para clientes enterprise
-- Integración via archivos planos
+| Ambiente | URL |
+|----------|-----|
+| **QA** | `https://conta-qa.transtecniasa.cl` |
+| **Producción** | `https://contabilidad-digital.transtecnia.cl` |
 
 ---
 
-## 3. Productos Principales
+## 2. Autenticación
 
-| Producto | Descripción | Potencial Integración |
-|----------|-------------|----------------------|
-| **Factura Electrónica** | Emisión/Recepción DTE | DTEs emitidos/recibidos |
-| **Contabilidad Digital** | ERP Contable | Balance, Mayor, Diario |
-| **Libros Electrónicos** | Libros SII | Compras, Ventas, Honorarios |
-| **Remuneraciones** | Liquidaciones de sueldo | Provisiones, pagos |
+Sistema de Tokens basado en credenciales de usuario.
+
+### Obtener Token
+
+```http
+POST /api/token/
+Content-Type: application/json
+
+{
+  "username": "11111111-1",  // RUT Usuario
+  "password": "tu_password"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "token": "a1b2c3d4e5...",
+  "email": "usuario@empresa.cl",
+  "client_id": 123,
+  "client_rut": "77123456-8"
+}
+```
+
+**Uso en requests:**
+```http
+Authorization: Token a1b2c3d4e5...
+```
 
 ---
 
-## 4. Preguntas para Soporte Transtecnia
+## 3. API de Lectura (Datos Base)
 
-Contactar a: **soporteweb@transtecnia.cl**
+### 3.1 Plan de Cuentas
 
-### Preguntas a realizar:
+```http
+GET /api/integration/plan_list/
+?company_code={code}
+&company_rut={rut}
+&year={año}
+```
 
-1. **¿Existe una API REST para integración?**
-   - Si existe, solicitar documentación
-   - Credenciales de sandbox
+**Respuesta:** Lista de cuentas con `code`, `name`, `accounting_type`
 
-2. **¿Qué métodos de exportación tienen?**
-   - Formatos: JSON, XML, Excel, CSV
-   - Automatización: ¿Se puede programar?
+| accounting_type | Significado |
+|-----------------|-------------|
+| 1 | Activo |
+| 2 | Pasivo |
+| 3 | Patrimonio |
+| 4 | Resultado |
 
-3. **¿Tienen webhooks o notificaciones?**
-   - Eventos de nuevos documentos
-   - Cambios de estado
+### 3.2 Centros de Resultado
 
-4. **¿Cuál es el modelo de licenciamiento?**
-   - Costo por API calls
-   - Plan enterprise con integración
+```http
+GET /api/integration/result_list/
+?company_code={code}
+&company_rut={rut}
+&year={año}
+```
 
-5. **¿Qué datos se pueden extraer?**
-   - DTEs (emitidos/recibidos)
-   - Balance, Mayor
-   - Movimientos bancarios
-   - Auxiliares (clientes/proveedores)
+### 3.3 Clientes y Proveedores
+
+```http
+GET /api/integration/client_list/
+?company_code={code}
+&company_rut={rut}
+&page={num}
+```
 
 ---
 
-## 5. Alternativas de Integración
+## 4. API de Reportes
 
-### Opción A: Exportación Manual
-```
-Usuario exporta → Archivo Excel/CSV → SGCA importa
-```
-- **Pros:** Simple, no requiere API
-- **Contras:** Manual, no tiempo real
+### 4.1 Libro Diario
 
-### Opción B: Base de Datos Directa
+```http
+GET /api/reports/daily_book/
+?date_from=01/01/2025
+&date_to=31/12/2025
+&company_code={code}
+&company_rut={rut}
 ```
-Transtecnia DB → Conexión SQL → SGCA
-```
-- **Pros:** Acceso completo
-- **Contras:** Requiere permisos, posible on-premise
 
-### Opción C: Scraping Portal
+**Respuesta:**
+```json
+{
+  "all_voucher": [
+    {
+      "number": 1,
+      "date": "02/01/2025",
+      "voucher_type": "Ingreso",
+      "movements": [
+        { "account": "110101", "debit": 1000, "assets": 0, "gloss": "Pago Fac..." }
+      ]
+    }
+  ]
+}
 ```
-Login portal → Scraping → SGCA
-```
-- **Pros:** No requiere API oficial
-- **Contras:** Frágil, mantenimiento alto
 
-### Opción D: SII Directo
+### 4.2 Libro Mayor
+
+```http
+GET /api/reports/ledger_book/
+?month_from=1
+&month_to=12
+&accounting_plan_from=1000000
+&accounting_plan_to=9999999
+&type=cuenta/mes
 ```
-Ignorar Transtecnia → SII API → SGCA
+
+### 4.3 Balance de Comprobación
+
+```http
+GET /api/reports/balance_check_samples/
+?month_from=1
+&month_to=12
+&current_year=2025
 ```
-- **Pros:** Fuente de verdad, independiente
-- **Contras:** Solo DTEs, no contabilidad
 
 ---
 
-## 6. Empresas SGCA que usan Transtecnia
+## 5. API de Escritura (Carga de Vouchers)
 
-| Empresa | Módulos | Estado |
-|---------|---------|--------|
-| (Pendiente de identificar) | - | - |
+### Carga Masiva CSV
+
+```http
+POST /api/vouchers/add
+Authorization: Token {token}
+Content-Type: multipart/form-data
+
+vod_file: archivo.csv
+rut: 76123456-K
+code: EMPRESA01
+year: 2025
+month: 12
+```
+
+### Formato CSV
+
+Separador: `;` | Encoding: `UTF-8`
+
+| Columna | Descripción |
+|---------|-------------|
+| CodEmpresa | Código interno |
+| RutEmpresa | RUT empresa |
+| Año, Mes, Dia | Fecha del voucher |
+| Tipo | I=Ingreso, E=Egreso, T=Traspaso |
+| Numero | Número correlativo |
+| TipoGeneracion | Tipo generación |
+| EvouID | ID único del voucher |
+| GlosaGeneral | Descripción general |
+| Cuenta | Código plan de cuentas |
+| Glosa | Detalle de la línea |
+| CentroResultado | Código centro costo |
+| Debe | Monto debe |
+| Haber | Monto haber |
+| DocTipo | Tipo documento |
+| DocNumero | Número documento |
+| DocVencimiento | Fecha vencimiento |
+| Rut | RUT tercero |
+| Extranjero | Flag extranjero |
+| Nombre | Nombre tercero |
+| Direccion | Dirección |
+| Comuna | Comuna |
+| TipoTrib | Tipo tributario |
+
+**Validaciones:**
+- ✅ Suma Debe = Suma Haber por cada `EvouID`
+- ✅ Cuentas y Centros de Costo deben existir
 
 ---
 
-## 7. Próximos Pasos
+## 6. Errores Comunes
 
-1. [ ] Identificar qué empresas SGCA usan Transtecnia
-2. [ ] Contactar soporte Transtecnia para info de API
-3. [ ] Evaluar si existe API enterprise
-4. [ ] Definir método de integración (API/Export/DB)
-5. [ ] Crear módulo `transtecnia/` si procede
+| Código | Error | Solución |
+|--------|-------|----------|
+| 401 | Unauthorized | Token vencido, renovar |
+| 404 | Not Found | Empresa no existe |
+| 400 | INVALID_YEAR | Año cerrado o no existe |
+| 400 | COMPANY_NOT_FOUND | RUT/Código no coinciden |
+| 400 | CSV inválido | Verificar UTF-8 y columnas |
+
+---
+
+## 7. Implementación SGCA
+
+### Endpoints Útiles para Control
+
+| Control | Endpoint | Uso |
+|---------|----------|-----|
+| **Balance** | `/api/reports/balance_check_samples/` | Estado financiero |
+| **Libro Mayor** | `/api/reports/ledger_book/` | Detalle por cuenta |
+| **Libro Diario** | `/api/reports/daily_book/` | Movimientos cronológicos |
+
+### Estructura Propuesta
+
+```
+sgca-integraciones/transtecnia/
+├── __init__.py
+├── auth.py          # Manejo de tokens
+├── client.py        # Cliente API
+├── pendientes.py    # Lógica de pendientes
+└── reports/
+    └── balance_excel.py
+```
 
 ---
 
@@ -125,19 +236,23 @@ Ignorar Transtecnia → SII API → SGCA
 
 | Aspecto | Skualo | Odoo | Transtecnia |
 |---------|--------|------|-------------|
-| API REST | ✅ Documentada | ❌ (PostgreSQL) | ❓ Desconocido |
-| Webhooks | ✅ Sí | ❌ No | ❓ Desconocido |
-| Acceso DB | ❌ No | ✅ Sí | ❓ Posible |
-| Documentación | ✅ Pública | ✅ Pública | ❌ No pública |
+| API REST | ✅ | ❌ | ✅ |
+| Autenticación | Bearer Token | PostgreSQL | Token usuario |
+| Webhooks | ✅ | ❌ | ❌ |
+| Carga de datos | ❌ | ✅ SQL | ✅ CSV |
+| Libro Mayor | ✅ | ✅ | ✅ |
+| Balance | ✅ | ✅ | ✅ |
 
 ---
 
-## Contacto Soporte
+## 9. Próximos Pasos
 
-- **Email:** soporteweb@transtecnia.cl
-- **Portal:** [Centro de Asistencia](https://transtecniasoporte.zohodesk.com/portal/es/home)
-- **Teléfono:** (Verificar en sitio web)
+1. [ ] Identificar empresas SGCA con Transtecnia
+2. [ ] Obtener credenciales de sandbox
+3. [ ] Crear módulo `transtecnia/`
+4. [ ] Implementar `pendientes.py`
+5. [ ] Integrar con bridge
 
 ---
 
-*Documento en desarrollo. Actualizar cuando se obtenga información de Transtecnia.*
+*Documento consolidado desde `APIs/TRANSTECNIA_API_BIBLIA_SGCA.md`*

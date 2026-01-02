@@ -13,7 +13,7 @@
 | **Fintoc** | API REST | - | 🔜 Pendiente |
 | **SII** | Portal + API | - | 🔜 Pendiente |
 | **Clay** | API REST | - | 🔜 Pendiente |
-| **Transtecnia** | ¿API? ¿Export? | - | 🔍 Investigando |
+| **Transtecnia** | API REST | - | 📚 Documentado |
 
 ---
 
