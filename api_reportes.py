@@ -62,9 +62,9 @@ def get_skualo_balance():
     from skualo.reports.balance_excel import generar_reporte
     return generar_reporte
 
-# Odoo balance aún no implementado
 def get_odoo_balance():
-    raise NotImplementedError("Reporte financiero Odoo aún no implementado")
+    from odoo.reports.balance_excel import generar_reporte
+    return generar_reporte
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -158,8 +158,8 @@ def reporte_financiero():
             generar = get_skualo_balance()
             filepath = generar(empresa_id, fecha_corte)
         else:
-            # Odoo balance pendiente
-            return jsonify({"error": "Reporte financiero Odoo aún no implementado"}), 501
+            generar = get_odoo_balance()
+            filepath = generar(empresa_id, fecha_corte)
         
         return send_file(
             filepath,
