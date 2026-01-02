@@ -121,6 +121,15 @@ def reporte_pendientes(empresa: str):
         return jsonify({"error": str(e)}), 500
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# REPORTE FINANCIERO - DESHABILITADO TEMPORALMENTE
+# ═══════════════════════════════════════════════════════════════════════════════
+# Motivo: Contiene información sensible de clientes
+# Para habilitar: cambiar FINANCIERO_HABILITADO = True
+# ═══════════════════════════════════════════════════════════════════════════════
+FINANCIERO_HABILITADO = False
+
+
 @app.route('/api/reports/financiero', methods=['POST'])
 def reporte_financiero():
     """
@@ -135,6 +144,13 @@ def reporte_financiero():
     Returns:
         Excel file download
     """
+    # Check si está habilitado
+    if not FINANCIERO_HABILITADO:
+        return jsonify({
+            "error": "Reporte financiero temporalmente deshabilitado",
+            "message": "Este reporte contiene información sensible. Contacte al administrador."
+        }), 403
+    
     try:
         data = request.get_json()
         empresa = data.get("empresa")
@@ -197,7 +213,7 @@ def reportes_disponibles(empresa: str):
             "nombre": "Reporte Financiero",
             "descripcion": "Balance, EERR, Análisis por cuenta",
             "requiere_fecha": True,
-            "disponible": erp == "skualo"  # Solo Skualo por ahora
+            "disponible": FINANCIERO_HABILITADO  # Deshabilitado temporalmente
         }
     ]
     
