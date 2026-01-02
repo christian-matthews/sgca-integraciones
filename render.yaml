@@ -9,6 +9,39 @@
 
 services:
   # ==========================================================================
+  # API REPORTES - Generación on-demand de Excel
+  # ==========================================================================
+  # Endpoints:
+  #   GET  /api/reports/pendientes/{empresa}
+  #   POST /api/reports/financiero
+  # ==========================================================================
+  - type: web
+    name: sgca-reportes-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn api_reportes:app --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.7"
+      # Odoo PostgreSQL (para reportes Odoo)
+      - key: SERVER
+        sync: false
+      - key: PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: PASSWORD
+        sync: false
+      # Skualo API (para reportes Skualo)
+      - key: SKUALO_API_TOKEN
+        sync: false
+      - key: SKUALO_BASE_URL
+        value: "https://api.skualo.cl"
+
+  # ==========================================================================
   # CRON ODOO - FactorIT SpA / Ltda
   # ==========================================================================
   # Fuente: PostgreSQL Odoo
