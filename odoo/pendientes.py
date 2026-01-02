@@ -20,7 +20,7 @@ Como módulo:
 import os
 import sys
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from decimal import Decimal
 from dotenv import load_dotenv
 import psycopg2
@@ -48,6 +48,19 @@ DATABASES = {
 # Fecha mínima para considerar pendientes de conciliación
 # Solo considera movimientos desde esta fecha en adelante
 CONCILIACION_FECHA_MINIMA = '2025-01-01'
+
+# ═══════════════════════════════════════════════════════════════════════════
+# POLÍTICA SII - ACEPTACIÓN TÁCITA
+# ═══════════════════════════════════════════════════════════════════════════
+# Según normativa SII Chile, los DTEs se aceptan tácitamente después de 8 días
+# naturales si no son explícitamente aceptados o rechazados.
+#
+# - ACCIONABLES: Documentos con < 8 días → requieren revisión y acción
+# - TÁCITOS SIN REVISAR: Documentos con >= 8 días en estado 'draft' → 
+#   fueron aceptados automáticamente por SII sin que el usuario los revisara
+#   (esto representa un riesgo de control)
+# ═══════════════════════════════════════════════════════════════════════════
+SII_DIAS_ACEPTACION_TACITA = 8
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -86,6 +99,13 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
     # ═══════════════════════════════════════════════════════════════════
     # 1. DOCUMENTOS POR ACEPTAR EN SII
     # ═══════════════════════════════════════════════════════════════════
+    # Separamos en dos grupos:
+    # - ACCIONABLES: < 8 días, requieren revisión y decisión
+    # - TÁCITOS SIN REVISAR: >= 8 días, SII los aceptó automáticamente
+    # ═══════════════════════════════════════════════════════════════════
+    
+    fecha_limite_tacito = date.today() - timedelta(days=SII_DIAS_ACEPTACION_TACITA)
+    
     cursor.execute('''
         SELECT 
             a.id,
@@ -100,12 +120,14 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
         ORDER BY a.date DESC
     ''')
     
-    docs_sii = []
-    total_sii = 0
+    docs_accionables = []
+    docs_tacitos = []
+    total_accionables = 0
+    total_tacitos = 0
+    
     for row in cursor.fetchall():
         doc_id, fecha, tipo, folio, proveedor, monto = row
         monto = float(monto or 0)
-        total_sii += monto
         
         # Parsear RUT y nombre del proveedor
         rut = ''
@@ -115,7 +137,7 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
             rut = parts[0]
             nombre = parts[1] if len(parts) > 1 else ''
         
-        docs_sii.append({
+        doc = {
             'id': doc_id,
             'fecha': fecha,
             'tipo': tipo,
@@ -123,12 +145,39 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
             'proveedor_rut': rut,
             'proveedor_nombre': nombre,
             'monto': monto,
-        })
+        }
+        
+        # Clasificar según fecha
+        if fecha and fecha >= fecha_limite_tacito:
+            # Documento reciente (< 8 días) → requiere acción
+            docs_accionables.append(doc)
+            total_accionables += monto
+        else:
+            # Documento antiguo (>= 8 días) → aceptado tácitamente sin revisar
+            doc['dias_sin_revisar'] = (date.today() - fecha).days if fecha else None
+            docs_tacitos.append(doc)
+            total_tacitos += monto
     
     resultado['pendientes_sii'] = {
-        'cantidad': len(docs_sii),
-        'total': total_sii,
-        'documentos': docs_sii,
+        # Resumen general (para compatibilidad)
+        'cantidad': len(docs_accionables) + len(docs_tacitos),
+        'total': total_accionables + total_tacitos,
+        
+        # ACCIONABLES: Los que realmente requieren trabajo
+        'accionables': {
+            'cantidad': len(docs_accionables),
+            'total': total_accionables,
+            'documentos': docs_accionables,
+            'descripcion': f'Documentos con menos de {SII_DIAS_ACEPTACION_TACITA} días, requieren revisión',
+        },
+        
+        # TÁCITOS: Aceptados automáticamente sin revisar (riesgo de control)
+        'tacitos_sin_revisar': {
+            'cantidad': len(docs_tacitos),
+            'total': total_tacitos,
+            'documentos': docs_tacitos,
+            'descripcion': f'Documentos con {SII_DIAS_ACEPTACION_TACITA}+ días, aceptados tácitamente por SII',
+        },
     }
     
     # ═══════════════════════════════════════════════════════════════════
@@ -181,6 +230,10 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
     # ═══════════════════════════════════════════════════════════════════
     # 3. MOVIMIENTOS BANCARIOS POR CONCILIAR
     # ═══════════════════════════════════════════════════════════════════
+    # CRITERIO CORRECTO: Un movimiento está pendiente de conciliar si
+    # NO tiene un account_move_line asociado (statement_line_id).
+    # Esto es lo que Odoo usa en su interfaz de conciliación.
+    # ═══════════════════════════════════════════════════════════════════
     
     # Extractos abiertos (solo desde CONCILIACION_FECHA_MINIMA)
     cursor.execute('''
@@ -210,7 +263,8 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
             'saldo_final': float(saldo_fin or 0),
         })
     
-    # Movimientos en extractos abiertos (solo desde CONCILIACION_FECHA_MINIMA)
+    # Movimientos SIN conciliar (sin account_move_line.statement_line_id)
+    # Este es el criterio correcto que usa Odoo internamente
     cursor.execute('''
         SELECT 
             abl.id,
@@ -224,8 +278,11 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
         JOIN account_bank_statement abs ON abl.statement_id = abs.id
         JOIN account_journal aj ON abs.journal_id = aj.id
         LEFT JOIN res_partner rp ON abl.partner_id = rp.id
-        WHERE abs.state = 'open'
-        AND abl.date >= %s
+        WHERE abl.date >= %s
+        AND NOT EXISTS (
+            SELECT 1 FROM account_move_line aml 
+            WHERE aml.statement_line_id = abl.id
+        )
         ORDER BY abl.date DESC
     ''', (CONCILIACION_FECHA_MINIMA,))
     
@@ -250,7 +307,7 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
             'referencia': referencia,
         })
     
-    # Resumen por banco (solo desde CONCILIACION_FECHA_MINIMA)
+    # Resumen por banco (solo pendientes reales)
     cursor.execute('''
         SELECT 
             aj.name as banco,
@@ -260,8 +317,11 @@ def obtener_pendientes_empresa(db_name: str) -> dict:
         FROM account_bank_statement_line abl
         JOIN account_bank_statement abs ON abl.statement_id = abs.id
         JOIN account_journal aj ON abs.journal_id = aj.id
-        WHERE abs.state = 'open'
-        AND abl.date >= %s
+        WHERE abl.date >= %s
+        AND NOT EXISTS (
+            SELECT 1 FROM account_move_line aml 
+            WHERE aml.statement_line_id = abl.id
+        )
         GROUP BY aj.name
         ORDER BY COUNT(*) DESC
     ''', (CONCILIACION_FECHA_MINIMA,))
@@ -359,8 +419,14 @@ def main():
             print(f"\n❌ {emp['empresa']}: {emp['error']}")
             continue
         
+        sii = emp['pendientes_sii']
+        accionables = sii.get('accionables', {})
+        tacitos = sii.get('tacitos_sin_revisar', {})
+        
         print(f"\n🏢 {emp['empresa']} ({emp['database']})")
-        print(f"   📄 SII pendientes: {emp['pendientes_sii']['cantidad']} docs (${emp['pendientes_sii']['total']:,.0f})")
+        print(f"   📄 SII pendientes:")
+        print(f"      ⚡ Accionables (<8d): {accionables.get('cantidad', 0)} docs (${accionables.get('total', 0):,.0f})")
+        print(f"      ⚠️  Tácitos (≥8d):    {tacitos.get('cantidad', 0)} docs (${tacitos.get('total', 0):,.0f})")
         print(f"   📝 Por contabilizar: {emp['pendientes_contabilizar']['cantidad']} asientos")
         print(f"   🏦 Por conciliar: {emp['pendientes_conciliar']['cantidad']} movimientos")
     

@@ -477,6 +477,8 @@ def insert_backlog_snapshot(
     sii_count: int,
     contabilizar_count: int,
     conciliar_count: int,
+    sii_tacitos_count: int = 0,
+    sii_tacitos_total: float = 0,
     dry_run: bool = False
 ) -> bool:
     """
@@ -487,9 +489,11 @@ def insert_backlog_snapshot(
         company_id: ID de la empresa
         db_alias: Alias de BD Odoo (FactorIT, FactorIT2)
         period: Período YYYY-MM
-        sii_count: Pendientes SII
+        sii_count: Pendientes SII ACCIONABLES (< 8 días) - activan SLA
         contabilizar_count: Pendientes por contabilizar
         conciliar_count: Pendientes por conciliar
+        sii_tacitos_count: Pendientes SII TÁCITOS (>= 8 días) - solo auditoría
+        sii_tacitos_total: Monto total de tácitos
         dry_run: Si True, no escribe
     
     Returns:
@@ -499,15 +503,22 @@ def insert_backlog_snapshot(
         "company_id": company_id,
         "period": period,
         "captured_at": now_chile().isoformat(),
-        "sii_count": sii_count,
+        "sii_count": sii_count,  # Solo accionables - esto activa el SLA
         "contabilizar_count": contabilizar_count,
         "conciliar_count": conciliar_count,
         "source": "odoo",
         "db_alias": db_alias,
+        # Raw contiene información adicional para auditoría
+        "raw": {
+            "sii_accionables": sii_count,
+            "sii_tacitos": sii_tacitos_count,
+            "sii_tacitos_monto": sii_tacitos_total,
+            "nota": "sii_count solo cuenta accionables (<8 días). Tácitos son aceptados automáticamente por SII.",
+        },
     }
     
     if dry_run:
-        logger.info(f"  [DRY-RUN] INSERT snapshot", **snapshot)
+        logger.info(f"  [DRY-RUN] INSERT snapshot", **{k: v for k, v in snapshot.items() if k != 'raw'})
         return True
     
     try:
@@ -517,6 +528,179 @@ def insert_backlog_snapshot(
     except Exception as e:
         logger.error(f"Error insertando snapshot: {e}")
         return False
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# RESOLUCIÓN POR TEMPORALIDAD
+# ═══════════════════════════════════════════════════════════════════════════════
+# Los findings de semanas pasadas se resuelven si no hay tx pendientes
+# anteriores a su fecha de corte (viernes de esa semana).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_cutoff_friday(finding_created_at: date) -> date:
+    """
+    Calcula el viernes de corte para un finding.
+    
+    El finding se crea el miércoles después del cierre semanal.
+    El corte es el viernes anterior (fin de la semana operacional).
+    
+    Args:
+        finding_created_at: Fecha de creación del finding
+    
+    Returns:
+        Fecha del viernes de corte
+    """
+    # weekday(): 0=Lunes, 4=Viernes, 6=Domingo
+    weekday = finding_created_at.weekday()
+    
+    if weekday == 4:  # Es viernes
+        return finding_created_at
+    elif weekday < 4:  # Lun-Jue → viernes de la semana anterior
+        days_back = weekday + 3  # Lun=4, Mar=5, Mie=6, Jue=7... wait
+        # Lun(0) → viernes anterior = -3
+        # Mar(1) → viernes anterior = -4
+        # Mie(2) → viernes anterior = -5
+        # Jue(3) → viernes anterior = -6
+        days_back = (weekday - 4) % 7
+        if days_back == 0:
+            days_back = 7
+        return finding_created_at - timedelta(days=days_back)
+    else:  # Sáb-Dom → viernes de esa semana
+        # Sab(5) → viernes = -1
+        # Dom(6) → viernes = -2
+        days_back = weekday - 4
+        return finding_created_at - timedelta(days=days_back)
+
+
+def resolve_findings_by_cutoff(
+    sb,
+    company_id: str,
+    pending_dates_conciliar: List[date],
+    pending_dates_contabilizar: List[date],
+    pending_dates_sii: List[date],
+    dry_run: bool = False
+) -> Dict[str, Any]:
+    """
+    Resuelve findings de semanas pasadas si no hay tx pendientes
+    anteriores a su fecha de corte.
+    
+    Args:
+        sb: Cliente Supabase
+        company_id: ID de la empresa
+        pending_dates_*: Listas de fechas de tx pendientes por categoría
+        dry_run: Si True, no escribe
+    
+    Returns:
+        Dict con resumen de resoluciones
+    """
+    result = {
+        "findings_checked": 0,
+        "findings_resolved": 0,
+        "findings_still_open": 0,
+        "details": []
+    }
+    
+    # Mapeo de códigos de finding a fechas pendientes
+    code_to_dates = {
+        "CIERRE_SEMANAL_CONCILIACION": pending_dates_conciliar,
+        "CIERRE_SEMANAL_CONTABILIZACION": pending_dates_contabilizar,
+        "CIERRE_MENSUAL_CONCILIACION": pending_dates_conciliar,
+        "CIERRE_MENSUAL_CONTABILIZACION": pending_dates_contabilizar,
+        "CONCILIACION_BANCARIA": pending_dates_conciliar,
+        "DIGITACION_FACTURAS": pending_dates_contabilizar,
+        "REVISION_FACTURAS_PROVEEDOR": pending_dates_sii,
+        "SII_FACTURAS_POR_APROBAR": pending_dates_sii,
+    }
+    
+    try:
+        # 1. Obtener findings OPEN de esta empresa
+        findings_resp = sb.table("findings").select(
+            "finding_id, expected_item_code, created_at"
+        ).eq("company_id", company_id).eq("status", "OPEN").execute()
+        
+        findings = findings_resp.data or []
+        
+        # 2. Filtrar solo findings de cierre semanal/mensual (los que tienen temporalidad)
+        temporal_codes = list(code_to_dates.keys())
+        findings = [f for f in findings if f["expected_item_code"] in temporal_codes]
+        
+        # 3. Ordenar de más antiguo a más nuevo
+        findings.sort(key=lambda f: f["created_at"])
+        
+        hoy = date.today()
+        
+        for finding in findings:
+            result["findings_checked"] += 1
+            
+            finding_id = finding["finding_id"]
+            code = finding["expected_item_code"]
+            created_at_str = finding["created_at"]
+            
+            # Parsear fecha de creación
+            try:
+                created_at = date.fromisoformat(created_at_str[:10])
+            except:
+                continue
+            
+            # Calcular fecha de corte
+            cutoff = get_cutoff_friday(created_at)
+            
+            # Si el corte es hoy o futuro, no resolver (es de la semana actual)
+            if cutoff >= hoy:
+                result["findings_still_open"] += 1
+                continue
+            
+            # Obtener fechas pendientes para este tipo
+            pending_dates = code_to_dates.get(code, [])
+            
+            # ¿Hay tx pendientes con fecha <= cutoff?
+            tx_before_cutoff = [d for d in pending_dates if d <= cutoff]
+            
+            if len(tx_before_cutoff) == 0:
+                # No hay tx pendientes de esa semana → Resolver
+                if not dry_run:
+                    # Actualizar finding a RESOLVED
+                    sb.table("findings").update({
+                        "status": "RESOLVED",
+                        "resolved_at": now_chile().isoformat(),
+                    }).eq("finding_id", finding_id).execute()
+                    
+                    # Crear evento de resolución
+                    sb.table("finding_events").insert({
+                        "finding_id": finding_id,
+                        "event_type": "RESOLVED_BY_CUTOFF",
+                        "payload": {
+                            "cutoff_date": cutoff.isoformat(),
+                            "pending_before_cutoff": 0,
+                            "resolved_by": "bridge_temporal_resolution",
+                        }
+                    }).execute()
+                
+                result["findings_resolved"] += 1
+                result["details"].append({
+                    "finding_id": finding_id[:8],
+                    "code": code,
+                    "cutoff": cutoff.isoformat(),
+                    "action": "resolved"
+                })
+                
+                logger.info(f"  ✓ Finding resuelto por temporalidad: {code} (corte: {cutoff})")
+            else:
+                result["findings_still_open"] += 1
+                result["details"].append({
+                    "finding_id": finding_id[:8],
+                    "code": code,
+                    "cutoff": cutoff.isoformat(),
+                    "pending_count": len(tx_before_cutoff),
+                    "action": "kept_open"
+                })
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error en resolución por temporalidad: {e}")
+        result["error"] = str(e)
+        return result
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -620,14 +804,30 @@ def sync_empresa(
         logger.error(f"Error obteniendo pendientes de Odoo: {e}")
         return summary
     
-    # Contadores totales (no filtrados por año para checks agregados)
-    summary["backlog_sii"] = pendientes["pendientes_sii"]["cantidad"]
+    # ═══════════════════════════════════════════════════════════════════════════
+    # CONTADORES DE BACKLOG
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Para SII: solo contamos los ACCIONABLES (< 8 días)
+    # Los tácitos (>= 8 días) se guardan en raw para auditoría pero NO activan SLA
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    sii_data = pendientes["pendientes_sii"]
+    accionables = sii_data.get("accionables", {})
+    tacitos = sii_data.get("tacitos_sin_revisar", {})
+    
+    # SLA solo cuenta accionables
+    summary["backlog_sii"] = accionables.get("cantidad", sii_data.get("cantidad", 0))
     summary["backlog_contabilizar"] = pendientes["pendientes_contabilizar"]["cantidad"]
     summary["backlog_conciliar"] = pendientes["pendientes_conciliar"]["cantidad"]
     
+    # Guardar tácitos para auditoría (no activan SLA)
+    summary["sii_tacitos_count"] = tacitos.get("cantidad", 0)
+    summary["sii_tacitos_total"] = tacitos.get("total", 0)
+    
     logger.info(
         f"  📊 Backlog Odoo",
-        sii=summary["backlog_sii"],
+        sii_accionables=summary["backlog_sii"],
+        sii_tacitos=summary["sii_tacitos_count"],
         contabilizar=summary["backlog_contabilizar"],
         conciliar=summary["backlog_conciliar"]
     )
@@ -803,11 +1003,66 @@ def sync_empresa(
         company_id,
         db_alias,
         period_str,
-        summary["backlog_sii"],
+        summary["backlog_sii"],  # Solo accionables
         summary["backlog_contabilizar"],
         summary["backlog_conciliar"],
+        sii_tacitos_count=summary.get("sii_tacitos_count", 0),
+        sii_tacitos_total=summary.get("sii_tacitos_total", 0),
         dry_run=dry_run
     )
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # E) RESOLUCIÓN POR TEMPORALIDAD
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Resuelve findings de semanas pasadas si no hay tx pendientes
+    # anteriores a su fecha de corte.
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    # Extraer fechas de los pendientes
+    def extract_dates(items: List[Dict]) -> List[date]:
+        """Extrae fechas de una lista de items."""
+        dates = []
+        for item in items:
+            fecha = item.get("fecha")
+            if fecha:
+                try:
+                    if isinstance(fecha, date):
+                        dates.append(fecha)
+                    else:
+                        dates.append(date.fromisoformat(str(fecha)[:10]))
+                except:
+                    pass
+        return dates
+    
+    pending_dates_conciliar = extract_dates(
+        pendientes.get("pendientes_conciliar", {}).get("movimientos", [])
+    )
+    pending_dates_contabilizar = extract_dates(
+        pendientes.get("pendientes_contabilizar", {}).get("asientos", [])
+    )
+    
+    # Para SII, combinar accionables y tácitos (ambos tienen fecha)
+    sii_docs = []
+    sii_data = pendientes.get("pendientes_sii", {})
+    sii_docs.extend(sii_data.get("accionables", {}).get("documentos", []))
+    sii_docs.extend(sii_data.get("tacitos_sin_revisar", {}).get("documentos", []))
+    pending_dates_sii = extract_dates(sii_docs)
+    
+    logger.info(f"\n  📅 RESOLUCIÓN POR TEMPORALIDAD:")
+    logger.info(f"     Fechas pendientes: conciliar={len(pending_dates_conciliar)}, contabilizar={len(pending_dates_contabilizar)}, sii={len(pending_dates_sii)}")
+    
+    resolution_result = resolve_findings_by_cutoff(
+        sb,
+        company_id,
+        pending_dates_conciliar,
+        pending_dates_contabilizar,
+        pending_dates_sii,
+        dry_run=dry_run
+    )
+    
+    summary["temporal_resolution"] = resolution_result
+    logger.info(f"     Findings revisados: {resolution_result['findings_checked']}")
+    logger.info(f"     Findings resueltos: {resolution_result['findings_resolved']}")
     
     # Log resumen estructurado
     logger.log_empresa_summary(summary)
