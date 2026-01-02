@@ -127,7 +127,7 @@ def reporte_pendientes(empresa: str):
 # Motivo: Contiene información sensible de clientes
 # Para habilitar: cambiar FINANCIERO_HABILITADO = True
 # ═══════════════════════════════════════════════════════════════════════════════
-FINANCIERO_HABILITADO = False
+FINANCIERO_HABILITADO = True
 
 
 @app.route('/api/reports/financiero', methods=['POST'])
