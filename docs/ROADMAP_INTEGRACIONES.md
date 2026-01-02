@@ -137,12 +137,15 @@ WHERE NOT EXISTS (
 
 ## 🏦 2. Integrar Fintoc
 
+> **📚 Documentación completa**: [`docs/FINTOC_API_BIBLIA.md`](./FINTOC_API_BIBLIA.md)
+
 ### ¿Qué es Fintoc?
 
 API bancaria chilena para:
 - Obtener saldos de cuentas
 - Obtener movimientos bancarios
-- Iniciación de pagos (opcional)
+- Acceso a DTEs SII (via widget)
+- Iniciación de pagos
 
 ### Valor para SGCA
 
@@ -150,18 +153,20 @@ API bancaria chilena para:
 |-------------|-----------|
 | **Conciliación automática** | Movimientos en tiempo real vs ERP |
 | **Detección de pagos** | Previred, F29, Remuneraciones |
-| **Alertas de liquidez** | Saldos bajos |
+| **Validación SII** | Segunda fuente independiente |
 
-### Preguntas a Resolver
+### Limitación Principal
 
-1. **¿Qué bancos usan las empresas?**
-   - BCI, Santander, Chile, otros?
-   
-2. **¿Tienen cuentas empresariales?**
-   - Fintoc requiere autorización del banco
+⚠️ **Requiere acción del usuario**: El usuario debe autenticarse via Widget Fintoc. No es 100% automático.
 
-3. **¿Quién autoriza la conexión?**
-   - El CFO/dueño debe vincular en Fintoc
+### Comparación con Clay
+
+| Criterio | Fintoc | Clay |
+|----------|--------|------|
+| **SII** | ✅ Via widget | ✅ Automático |
+| **Bancos** | ✅ Múltiples | ⚠️ Limitado |
+| **Automatización** | ⚠️ Requiere widget | ✅ Completa |
+| **Costo** | Por transacción | Por empresa/mes |
 
 ### Arquitectura Propuesta
 
@@ -175,7 +180,7 @@ API bancaria chilena para:
 ### Próximos Pasos
 
 1. [ ] Crear cuenta Fintoc (dev/sandbox)
-2. [ ] Revisar documentación API
+2. [x] Documentar API → `docs/FINTOC_API_BIBLIA.md`
 3. [ ] Definir qué datos sincronizar
 4. [ ] Vincular primera empresa de prueba
 
