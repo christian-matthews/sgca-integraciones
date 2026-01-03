@@ -1,13 +1,19 @@
-# CLAY_API_BIBLIA_SGCA.md
+# CLAY API - Documentación SGCA
+
+> **Estado:** ✅ Integrado y Funcionando  
+> **Última actualización:** 2 Enero 2026  
+> **Módulo:** `sgca-integraciones/clay/`
+
+---
 
 # 0) Portada
+
 **Qué es Clay API**:
 La API de Clay (Clay.cl) expone funcionalidades core de su plataforma de gestión financiera y contable automatizada. Está centrada en la automatización bancaria (Fintoc/Scraping), gestión de obligaciones (DTEs del SII) y la conciliación inteligente ("Match"). Su diseño sugiere un enfoque de "contabilidad derivada de operaciones" más que un libro mayor manual tradicional.
 
 **Alcance**:
 Este documento indexa la totalidad de los endpoints expuestos en la especificación OpenAPI v3 oficial, documenta los modelos de datos (Schemas) y evalúa su viabilidad técnica como motor contable subyacente para pequeñas empresas en el contexto de SGCA.
 
-**Fecha**: 02 de Enero de 2026
 **Fuentes consultadas**:
 - [Swagger UI Oficial](https://api.clay.cl/docs)
 - [ReDoc Oficial](https://api.clay.cl/redoc)
@@ -17,11 +23,115 @@ Este documento indexa la totalidad de los endpoints expuestos en la especificaci
 
 # 1) Quickstart técnico
 
-- **Base URL**: `https://api.clay.cl`
-- **Auth**: Autenticación vía Header.
-  - Header Name: `Token`
-  - Valor: `<API_KEY>`
-  - Esquema: `apiKey` (según especificación OpenAPI).
+## Configuración
+
+### Variables de entorno
+```bash
+# En .env
+CLAY_API_TOKEN=tu_token_aqui
+```
+
+### Autenticación
+```http
+GET https://api.clay.cl/v1/empresas/
+Token: <API_KEY>
+```
+
+| Aspecto | Valor |
+|---------|-------|
+| **Base URL** | `https://api.clay.cl` |
+| **Auth Header** | `Token` |
+| **Formato** | JSON |
+
+## ⚠️ IMPORTANTE: Formato de RUT
+
+Clay requiere el RUT **sin guión y sin dígito verificador**:
+
+| Formato | Ejemplo | ¿Válido? |
+|---------|---------|----------|
+| Solo número base | `77371445` | ✅ Correcto |
+| Con guión y DV | `77371445-2` | ❌ Error 404 |
+| Con DV pegado | `773714452` | ❌ Error 404 |
+
+El cliente Python normaliza automáticamente:
+```python
+ClayClient.normalize_rut("77371445-2")  # -> "77371445"
+```
+
+## Parámetros obligatorios por endpoint
+
+| Endpoint | Parámetros requeridos |
+|----------|----------------------|
+| `/v1/contabilidad/balance/` | `rut_empresa`, `fecha_desde` |
+| `/v1/obligaciones/documentos_pendientes/` | `rut_empresa` |
+| `/v1/cuentas_bancarias/movimientos/` | `rut_empresa`, `numero_cuenta`, `fecha_desde` |
+| `/v1/contabilidad/libro_mayor/` | `rut_empresa`, `cuenta` |
+
+## Uso del cliente SGCA
+
+```python
+from clay.client import ClayClient
+
+client = ClayClient()
+
+# Listar empresas disponibles
+empresas = client.listar_empresas()
+
+# Balance (fecha_desde obligatorio)
+balance = client.balance("77371445-2", fecha_desde="2025-01-01")
+
+# DTEs pendientes
+pendientes = client.documentos_pendientes("77371445-2")
+
+# Libro Mayor de una cuenta
+mayor = client.libro_mayor("77371445-2", cuenta="1.02.01.01")
+```
+
+## Empresas configuradas en SGCA
+
+| Key | RUT | Nombre | Estado |
+|-----|-----|--------|--------|
+| WELLNESS | 77858226-0 | Centro de Bienestar Integral Hualpen SpA | ✅ |
+| CIRCLE | 77126912-5 | Circle SpA | ✅ |
+| MEDX | 77371445-2 | MedX SpA | ✅ Probado |
+
+Configuración en: `clay/config/tenants.json`
+
+---
+
+# 1.1) Estructura de respuestas
+
+Todas las respuestas siguen esta estructura:
+```json
+{
+  "status": true,
+  "data": {
+    "records": {
+      "total_records": 61,
+      "items": 61,
+      "limit": 100,
+      "offset": 0
+    },
+    "items": [...]
+  },
+  "request_counter": 5
+}
+```
+
+---
+
+# 1.2) Errores comunes
+
+| Status | Error | Causa | Solución |
+|--------|-------|-------|----------|
+| 404 | "No se encontró la empresa" | RUT con DV | Usar solo número base |
+| 422 | "field required" | Falta parámetro | Agregar parámetro requerido |
+| 401 | Unauthorized | Token inválido | Verificar CLAY_API_TOKEN |
+
+---
+
+# 2) Especificación técnica original
+
 - **Rate Limits**: NO DOCUMENTADO EN FUENTES. No se observan headers `X-RateLimit` en la especificación.
 - **Paginación**: Estándar en endpoints de listado (`GET`).
   - `limit`: (Optional) entero, por defecto suele ser 50 o 100.
